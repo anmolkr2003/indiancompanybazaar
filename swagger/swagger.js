@@ -8,7 +8,10 @@ const options = {
       version: pkg.version,
       description: 'API for business marketplace with buyer/seller/ca/admin roles and verification flow.'
     },
-    servers: [{ url: 'http://localhost:5000' }]
+    servers: [
+      { url: 'https://indiancompanybazaar.onrender.com' }, // Render URL
+      { url: 'http://localhost:5000' } // Local URL (optional)
+    ]
   },
   apis: ['./routes/*.js', './models/*.js'],
 };

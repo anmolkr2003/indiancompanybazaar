@@ -4,7 +4,7 @@ const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, required: true, unique: true },
   password: String,
-  role: { type: String, enum: ["user","buyer", "seller", "ca"], default: "buyer" },
+  role: { type: String, enum: ["user","buyer", "seller", "ca", "admin"], default: "buyer" },
   isVerified: { type: Boolean, default: false },
   verificationToken: String
 });

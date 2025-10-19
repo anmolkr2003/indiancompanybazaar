@@ -112,6 +112,36 @@ router.post("/register", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     description: Creates a pending user and sends OTP email for verification.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: OTP sent to email
+ *       400:
+ *         description: Missing or invalid input
+ */
+router.post("/register", async (req, res) => {
+  // your registration code
+});
+
 
 // ====================
 // 🔐 Verify OTP
@@ -175,6 +205,33 @@ router.post("/login", async (req, res) => {
 });
 
 module.exports = router;
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login with email and password
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successful login
+ *       400:
+ *         description: Invalid credentials
+ */
+router.post("/login", async (req, res) => {
+  // your login code
+});
+
 
 
 // Buyer dashboard

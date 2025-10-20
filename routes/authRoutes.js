@@ -146,6 +146,37 @@ router.post("/register", async (req, res) => {
 // ====================
 // 🔐 Verify OTP
 // ====================
+/**
+ * @swagger
+ * /api/auth/verify-otp:
+ *   post:
+ *     summary: Verify OTP and complete registration
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - otp
+ *             properties:
+ *               email:
+ *                 type: string
+ *              
+ *               otp:
+ *                 type: string
+ * 
+ *     responses:
+ *       201:
+ *         description: User verified and registered
+ *       400:
+ *         description: Invalid or expired OTP
+ *       500:
+ *         description: Internal server error
+ */
+
 router.post("/verify-otp", async (req, res) => {
   const { email, otp } = req.body;
 

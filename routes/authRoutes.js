@@ -138,9 +138,6 @@ router.post("/register", async (req, res) => {
  *       400:
  *         description: Missing or invalid input
  */
-router.post("/register", async (req, res) => {
-  // your registration code
-});
 
 
 // ====================
@@ -233,30 +230,26 @@ router.post("/verify-otp", async (req, res) => {
  */
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
-
   try {
     const user = await User.findOne({ email }).select("+password");
-    if (!user) return res.status(400).json({ error: "Invalid credentials" });
+    if (!user) return res.status(400).json({ error: "User not found" });
 
+    console.log("DB password:", user.password);
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
+    if (!isMatch) return res.status(400).json({ error: "Password mismatch" });
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
 
     user.password = undefined;
-
-    res.status(200).json({
-      message: "Login successful",
-      token,
-      user,
-    });
+    res.status(200).json({ message: "Login successful", token, user });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 

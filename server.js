@@ -11,7 +11,11 @@ const swaggerSpec = require('./swagger/swagger');
 
 dotenv.config();
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: "*", // or specific domains ["https://your-frontend.com"]
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

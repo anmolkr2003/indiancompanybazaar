@@ -208,6 +208,29 @@ router.post("/verify-otp", async (req, res) => {
 // ====================
 // 🔑 Login
 // ====================
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login with email and password
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Successful login
+ *       400:
+ *         description: Invalid credentials
+ */
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -235,33 +258,7 @@ router.post("/login", async (req, res) => {
   }
 });
 
-module.exports = router;
-/**
- * @swagger
- * /api/auth/login:
- *   post:
- *     summary: Login with email and password
- *     tags: [Auth]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
- *               password:
- *                 type: string
- *     responses:
- *       200:
- *         description: Successful login
- *       400:
- *         description: Invalid credentials
- */
-router.post("/login", async (req, res) => {
-  // your login code
-});
+
 
 
 

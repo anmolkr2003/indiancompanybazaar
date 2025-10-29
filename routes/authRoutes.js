@@ -230,26 +230,110 @@ router.post("/verify-otp", async (req, res) => {
  */
 router.post("/login", async (req, res) => {
   const { email, password } = req.body;
+
   try {
     const user = await User.findOne({ email }).select("+password");
     if (!user) return res.status(400).json({ error: "User not found" });
 
-    console.log("DB password:", user.password);
+    if (!user.isVerified)
+      return res.status(403).json({ error: "Please verify your email before logging in" });
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ error: "Password mismatch" });
 
-    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    // ✅ Include role inside JWT
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
+    // ✅ Don’t return password
     user.password = undefined;
-    res.status(200).json({ message: "Login successful", token, user });
+
+    // ✅ Include role in response
+    res.status(200).json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role, // 👈 Added role here
+      },
+    });
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Server error" });
   }
 });
 
+
+
+/**
+ * @swagger
+ * /api/auth/set-role:
+ *   post:
+ *     summary: Set or update user role after onboarding
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userId
+ *               - role
+ *             properties:
+ *               userId:
+ *                 type: string
+ *                 example: 654adf1e9b9f4a7efb0a89c3
+ *               role:
+ *                 type: string
+ *                 enum: [buyer, seller, investor, admin]
+ *                 example: seller
+ *     responses:
+ *       200:
+ *         description: Role updated successfully
+ *       400:
+ *         description: Missing userId or role
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
+
+
+router.post("/set-role", async (req, res) => {
+  try {
+    const { userId, role } = req.body;
+
+    if (!userId || !role)
+      return res.status(400).json({ error: "userId and role are required" });
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { role },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    res.status(200).json({
+      message: "Role updated successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("Set role error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
 
 
 

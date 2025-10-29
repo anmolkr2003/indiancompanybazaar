@@ -307,10 +307,10 @@ router.post("/login", async (req, res) => {
 
 router.post("/set-role", async (req, res) => {
   try {
-    const { userId, role } = req.body;
+    const { email, role } = req.body;
 
-    if (!userId || !role)
-      return res.status(400).json({ error: "userId and role are required" });
+    if (!email || !role)
+      return res.status(400).json({ error: "emailid and role are required" });
 
     const user = await User.findByIdAndUpdate(
       userId,

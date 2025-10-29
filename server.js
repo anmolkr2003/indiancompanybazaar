@@ -26,7 +26,8 @@ const offerRoutes = require('./routes/offerRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 
 app.use('/api/auth', authRoutes);
-app.use('/api/businesses', businessRoutes);
+app.use("/api/business", businessRoutes);
+// app.use("/api/company", companyRoutes); // for company registration
 app.use('/api/admin', adminRoutes);
 app.use('/api/offers', offerRoutes);
 app.use('/api/orders', orderRoutes);

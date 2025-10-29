@@ -14,7 +14,7 @@ const router = express.Router();
  * @swagger
  * tags:
  *   name: Business
- *   description: APIs related to business registration, auctions, and documents
+ *   description: API endpoints for managing businesses
  */
 
 /**
@@ -29,22 +29,24 @@ const router = express.Router();
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - name
- *               - ownerName
  *             properties:
- *               name:
+ *               businessName:
  *                 type: string
- *                 example: "TechCorp Ltd"
- *               ownerName:
+ *                 example: "Tata Motors"
+ *               industry:
  *                 type: string
- *                 example: "Rahul Kumar"
+ *                 example: "Automobile"
  *               description:
  *                 type: string
- *                 example: "IT Consulting Services"
+ *                 example: "Leading car manufacturer in India"
+ *               location:
+ *                 type: string
+ *                 example: "Mumbai, India"
  *     responses:
  *       201:
  *         description: Business registered successfully
+ *       500:
+ *         description: Server error
  */
 router.post("/register", registerBusiness);
 
@@ -60,26 +62,28 @@ router.post("/register", registerBusiness);
  *         required: true
  *         schema:
  *           type: string
- *         description: ID of the business
+ *         description: Business ID
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - auctionDate
- *               - startingPrice
  *             properties:
- *               auctionDate:
- *                 type: string
- *                 example: "2025-11-01"
- *               startingPrice:
+ *               startingBid:
  *                 type: number
  *                 example: 50000
+ *               startTime:
+ *                 type: string
+ *                 example: "2025-10-29T10:00:00Z"
+ *               endTime:
+ *                 type: string
+ *                 example: "2025-10-30T10:00:00Z"
  *     responses:
  *       200:
  *         description: Auction details added successfully
+ *       404:
+ *         description: Business not found
  */
 router.post("/:businessId/auction", addAuctionDetails);
 
@@ -87,7 +91,7 @@ router.post("/:businessId/auction", addAuctionDetails);
  * @swagger
  * /api/business/{businessId}/documents:
  *   post:
- *     summary: Upload business documents
+ *     summary: Upload documents for a business
  *     tags: [Business]
  *     parameters:
  *       - in: path
@@ -95,10 +99,33 @@ router.post("/:businessId/auction", addAuctionDetails);
  *         required: true
  *         schema:
  *           type: string
- *         description: ID of the business
+ *         description: Business ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     type:
+ *                       type: string
+ *                       example: "license"
+ *                     name:
+ *                       type: string
+ *                       example: "Company License"
+ *                     url:
+ *                       type: string
+ *                       example: "https://supabase.io/license.pdf"
  *     responses:
  *       200:
  *         description: Documents uploaded successfully
+ *       404:
+ *         description: Business not found
  */
 router.post("/:businessId/documents", uploadBusinessDocuments);
 
@@ -106,7 +133,7 @@ router.post("/:businessId/documents", uploadBusinessDocuments);
  * @swagger
  * /api/business:
  *   get:
- *     summary: Get all registered businesses
+ *     summary: Get all businesses
  *     tags: [Business]
  *     responses:
  *       200:
@@ -118,7 +145,7 @@ router.get("/", getAllBusinesses);
  * @swagger
  * /api/business/{businessId}:
  *   get:
- *     summary: Get business details by ID
+ *     summary: Get a single business by ID
  *     tags: [Business]
  *     parameters:
  *       - in: path
@@ -126,10 +153,11 @@ router.get("/", getAllBusinesses);
  *         required: true
  *         schema:
  *           type: string
- *         description: ID of the business
  *     responses:
  *       200:
- *         description: Business details fetched successfully
+ *         description: Business details
+ *       404:
+ *         description: Business not found
  */
 router.get("/:businessId", getBusinessById);
 
@@ -137,7 +165,7 @@ router.get("/:businessId", getBusinessById);
  * @swagger
  * /api/business/{businessId}:
  *   delete:
- *     summary: Delete a business by ID
+ *     summary: Delete a business
  *     tags: [Business]
  *     parameters:
  *       - in: path
@@ -148,6 +176,8 @@ router.get("/:businessId", getBusinessById);
  *     responses:
  *       200:
  *         description: Business deleted successfully
+ *       404:
+ *         description: Business not found
  */
 router.delete("/:businessId", deleteBusiness);
 

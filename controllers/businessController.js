@@ -1,7 +1,7 @@
-import Business from "../models/Business.js";
+const Business = require("../models/Business.js");
 
 // 🏢 Register a new business
-export const registerBusiness = async (req, res) => {
+const registerBusiness = async (req, res) => {
   try {
     const business = new Business(req.body);
     await business.save();
@@ -17,7 +17,7 @@ export const registerBusiness = async (req, res) => {
 };
 
 // 💰 Add auction details
-export const addAuctionDetails = async (req, res) => {
+const addAuctionDetails = async (req, res) => {
   try {
     const { businessId } = req.params;
     const business = await Business.findById(businessId);
@@ -26,7 +26,6 @@ export const addAuctionDetails = async (req, res) => {
       return res.status(404).json({ message: "Business not found" });
     }
 
-    // Add auction info (starting bid, start/end time)
     business.auctionDetails = req.body;
     await business.save();
 
@@ -40,18 +39,17 @@ export const addAuctionDetails = async (req, res) => {
   }
 };
 
-// 📂 Upload business documents (images, PDFs, etc.)
-export const uploadBusinessDocuments = async (req, res) => {
+// 📂 Upload business documents
+const uploadBusinessDocuments = async (req, res) => {
   try {
     const { businessId } = req.params;
-    const { documents } = req.body; // expect array of { type, name, url }
+    const { documents } = req.body;
 
     const business = await Business.findById(businessId);
     if (!business) {
       return res.status(404).json({ message: "Business not found" });
     }
 
-    // Add new documents
     if (documents && documents.length > 0) {
       business.documents.push(...documents);
       await business.save();
@@ -68,7 +66,7 @@ export const uploadBusinessDocuments = async (req, res) => {
 };
 
 // 📋 Get all businesses
-export const getAllBusinesses = async (req, res) => {
+const getAllBusinesses = async (req, res) => {
   try {
     const businesses = await Business.find().sort({ createdAt: -1 });
     res.json(businesses);
@@ -79,7 +77,7 @@ export const getAllBusinesses = async (req, res) => {
 };
 
 // 🔍 Get single business by ID
-export const getBusinessById = async (req, res) => {
+const getBusinessById = async (req, res) => {
   try {
     const { businessId } = req.params;
     const business = await Business.findById(businessId);
@@ -96,7 +94,7 @@ export const getBusinessById = async (req, res) => {
 };
 
 // ❌ Delete a business
-export const deleteBusiness = async (req, res) => {
+const deleteBusiness = async (req, res) => {
   try {
     const { businessId } = req.params;
     const business = await Business.findByIdAndDelete(businessId);
@@ -110,4 +108,13 @@ export const deleteBusiness = async (req, res) => {
     console.error("Error deleting business:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
+};
+
+module.exports = {
+  registerBusiness,
+  addAuctionDetails,
+  uploadBusinessDocuments,
+  getAllBusinesses,
+  getBusinessById,
+  deleteBusiness,
 };

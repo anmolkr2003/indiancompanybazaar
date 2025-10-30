@@ -23,31 +23,57 @@ const router = express.Router();
  *   post:
  *     summary: Register a new business
  *     tags: [Business]
+ *     description: Creates a new company listing and stores it in the database.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - userId
+ *               - CIN
+ *               - companyName
  *             properties:
- *               businessName:
+ *               userId:
  *                 type: string
- *                 example: "Tata Motors"
- *               industry:
+ *                 example: "671f26c18a82e03f06e2b4c1"
+ *               CIN:
  *                 type: string
- *                 example: "Automobile"
+ *                 example: "U12345DL2020PTC123456"
+ *               companyName:
+ *                 type: string
+ *                 example: "ABC Pvt Ltd"
+ *               ROC:
+ *                 type: string
+ *                 example: "Delhi"
+ *               registeredAddress:
+ *                 type: string
+ *                 example: "123 Business Street, New Delhi"
+ *               categoryOfCompany:
+ *                 type: string
+ *                 example: "Private"
+ *               classOfCompany:
+ *                 type: string
+ *                 example: "Limited"
+ *               authorizedCapital:
+ *                 type: number
+ *                 example: 1000000
+ *               paidUpCapital:
+ *                 type: number
+ *                 example: 500000
  *               description:
  *                 type: string
- *                 example: "Leading car manufacturer in India"
- *               location:
- *                 type: string
- *                 example: "Mumbai, India"
+ *                 example: "We manufacture electric vehicles."
  *     responses:
  *       201:
  *         description: Business registered successfully
+ *       400:
+ *         description: Missing or invalid input
  *       500:
- *         description: Server error
+ *         description: Internal server error
  */
+
 router.post("/register", registerBusiness);
 
 /**

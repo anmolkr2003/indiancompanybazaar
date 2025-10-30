@@ -28,14 +28,8 @@ const swaggerSpec = swaggerJsDoc(options);
 
 function swaggerDocs(app) {
   // Serve Swagger UI
- app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    explorer: true,
-    customCss: ".swagger-ui .topbar { display: none }"
-  })
-);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 
 
   // 👇 Serve raw Swagger JSON for debugging

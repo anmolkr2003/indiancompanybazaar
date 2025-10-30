@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const directorSchema = new mongoose.Schema({
   name: String,
@@ -64,4 +64,4 @@ const companyListingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("CompanyListing", companyListingSchema);
+module.exports = mongoose.model("CompanyListing", companyListingSchema);

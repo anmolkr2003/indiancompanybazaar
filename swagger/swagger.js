@@ -12,11 +12,11 @@ const options = {
     },
     servers: [
   {
-    url: "https://indiancompanybazaar.onrender.com/api", // ✅ use your Render base URL
+    url: "https://indiancompanybazaar.onrender.com", // ✅ use your Render base URL
     description: "Production server"
   },
   {
-    url: "http://localhost:5000/api",
+    url: "http://localhost:5000",
     description: "Local server"
   }
 ]

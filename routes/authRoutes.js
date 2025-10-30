@@ -283,7 +283,7 @@ router.post("/login", async (req, res) => {
  *           schema:
  *             type: object
  *             required:
- *               - userId
+ *               - email
  *               - role
  *             properties:
  *               userId:
@@ -313,7 +313,7 @@ router.post("/set-role", async (req, res) => {
       return res.status(400).json({ error: "emailid and role are required" });
 
     const user = await User.findByIdAndUpdate(
-      userId,
+      email,
       { role },
       { new: true, runValidators: true }
     );

@@ -7,6 +7,8 @@ const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./swagger/swagger');
 // const authRoutes = require("./routes/authRoute");
+const swaggerDocs = require("./swagger/swagger"); // ✅ Path to your swagger.js
+// const swaggerDocs = require("./swagger"); // 👈 this line
 
 
 dotenv.config();
@@ -31,6 +33,8 @@ app.use("/api/business", businessRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/offers', offerRoutes);
 app.use('/api/orders', orderRoutes);
+
+swaggerDocs(app);
 
 // app.use("/api/auth", authRoutes);
 // Swagger UI

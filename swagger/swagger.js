@@ -1,9 +1,10 @@
+// swagger.js
 const swaggerJsDoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
 
 const options = {
   definition: {
-    openapi: "3.0.0", // ✅ Must be exactly this key (not "swagger")
+    openapi: "3.0.0", // ✅ must be 'openapi', not 'swagger'
     info: {
       title: "Indian Company Bazaar API",
       version: "1.0.0",
@@ -12,19 +13,28 @@ const options = {
     servers: [
       {
         url: "http://localhost:5000",
-        description: "Local server",
+        description: "Local Server",
       },
       {
         url: "https://indiancompanybazaar.onrender.com",
-        description: "Deployed server",
+        description: "Production Server",
       },
     ],
   },
-  apis: ["./routes/*.js"], // ✅ all route files with @swagger docs
+  apis: ["./routes/*.js"], // 👈 Make sure this path matches your route folder
 };
 
 const swaggerSpec = swaggerJsDoc(options);
 
-module.exports = function (app) {
+function swaggerDocs(app) {
+  // Serve Swagger UI
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-};
+
+  // 👇 Serve raw Swagger JSON for debugging
+  app.get("/swagger.json", (req, res) => {
+    res.setHeader("Content-Type", "application/json");
+    res.send(swaggerSpec);
+  });
+}
+
+module.exports = swaggerDocs;

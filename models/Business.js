@@ -17,7 +17,7 @@ const documentSchema = new mongoose.Schema({
   url: String, // Supabase or Cloudinary URL
 });
 
-const companyListingSchema = new mongoose.Schema(
+const businessListingSchema = new mongoose.Schema(
   {
     // 🔹 Step 1: Company Information
     userId: {
@@ -64,4 +64,4 @@ const companyListingSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("CompanyListing", companyListingSchema);
+module.exports = mongoose.model("businesses", businessListingSchema);

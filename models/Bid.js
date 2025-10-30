@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const bidSchema = new mongoose.Schema({
   company: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "CompanyListing",
+    ref: "businesses",
     required: true,
   },
   buyer: {

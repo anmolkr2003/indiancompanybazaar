@@ -23,15 +23,17 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const authRoutes = require('./routes/authRoutes');
 const businessRoutes = require('./routes/businessRoutes');
 const adminRoutes = require('./routes/adminRoutes');
-const offerRoutes = require('./routes/offerRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+
+const buyerRoutes = require("./routes/buyerRoutes");
+
 
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/business', businessRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/offers', offerRoutes);
 app.use('/api/orders', orderRoutes);
+app.use("/api/buyer", buyerRoutes);
 
 // ✅ Initialize Swagger properly (only once)
 swaggerDocs(app);

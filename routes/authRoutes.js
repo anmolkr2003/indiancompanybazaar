@@ -274,8 +274,10 @@ router.post("/login", async (req, res) => {
  * @swagger
  * /api/auth/set-role:
  *   post:
- *     summary: Set or update user role after onboarding
- *     tags: [Auth]
+ *     summary: Set user role by email
+ *     description: Update the user's role using their email address.
+ *     tags:
+ *       - Auth
  *     requestBody:
  *       required: true
  *       content:
@@ -286,39 +288,38 @@ router.post("/login", async (req, res) => {
  *               - email
  *               - role
  *             properties:
- *               userId:
+ *               email:
  *                 type: string
- *                 example: 654adf1e9b9f4a7efb0a89c3
+ *                 example: "string@gmail.com"
  *               role:
  *                 type: string
  *                 enum: [buyer, seller, investor, admin]
- *                 example: seller
+ *                 example: "seller"
  *     responses:
  *       200:
  *         description: Role updated successfully
  *       400:
- *         description: Missing userId or role
+ *         description: Missing email or role
  *       404:
  *         description: User not found
  *       500:
  *         description: Server error
  */
-
-
 router.post("/set-role", async (req, res) => {
   try {
     const { email, role } = req.body;
 
     if (!email || !role)
-      return res.status(400).json({ error: "emailid and role are required" });
+      return res.status(400).json({ error: "Email and role are required" });
 
-    const user = await User.findByIdAndUpdate(
-      email,
+    const user = await User.findOneAndUpdate(
+      { email },
       { role },
       { new: true, runValidators: true }
     );
 
-    if (!user) return res.status(404).json({ error: "User not found" });
+    if (!user)
+      return res.status(404).json({ error: "User not found" });
 
     res.status(200).json({
       message: "Role updated successfully",
@@ -334,6 +335,7 @@ router.post("/set-role", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
 
 
 

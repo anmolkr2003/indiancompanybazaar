@@ -7,6 +7,9 @@ const {
   getBusinessById,
   deleteBusiness,
 } = require("../controllers/businessController");
+const Business = require("../models/Business.js"); 
+
+const upload = require("../middleware/upload");
 
 const router = express.Router();
 
@@ -118,42 +121,70 @@ router.post("/:businessId/auction", addAuctionDetails);
  * /api/business/{businessId}/documents:
  *   post:
  *     summary: Upload documents for a business
- *     tags: [Business]
+ *     tags:
+ *       - Business
  *     parameters:
  *       - in: path
  *         name: businessId
  *         required: true
  *         schema:
  *           type: string
- *         description: Business ID
+ *         description: The ID of the business to upload documents for
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
- *               documents:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     type:
- *                       type: string
- *                       example: "license"
- *                     name:
- *                       type: string
- *                       example: "Company License"
- *                     url:
- *                       type: string
- *                       example: "https://supabase.io/license.pdf"
+ *               type:
+ *                 type: string
+ *                 example: "license"
+ *               name:
+ *                 type: string
+ *                 example: "Company License"
+ *               file:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       200:
  *         description: Documents uploaded successfully
  *       404:
  *         description: Business not found
  */
-router.post("/:businessId/documents", uploadBusinessDocuments);
+router.post(
+  "/:businessId/documents",
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      const { businessId } = req.params;
+      const { type, name } = req.body;
+
+      const business = await Business.findById(businessId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      const document = {
+        type,
+        name,
+        url: req.file.path, // Cloudinary file URL
+      };
+
+      business.documents.push(document);
+      await business.save();
+
+      res.status(200).json({
+        message: "Document uploaded successfully",
+        document,
+      });
+    } catch (err) {
+      console.error("Error uploading document:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  }
+);
+
+module.exports = router;
+
 
 /**
  * @swagger

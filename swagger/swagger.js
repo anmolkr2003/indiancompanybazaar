@@ -11,15 +11,16 @@ const options = {
       description: "API documentation for Indian Company Bazaar project",
     },
     servers: [
-      {
-        url: "http://localhost:5000",
-        description: "Local Server",
-      },
-      {
-        url: "https://indiancompanybazaar.onrender.com",
-        description: "Production Server",
-      },
-    ],
+  {
+    url: "https://indiancompanybazaar.onrender.com/api", // ✅ use your Render base URL
+    description: "Production server"
+  },
+  {
+    url: "http://localhost:5000/api",
+    description: "Local server"
+  }
+]
+,
   },
   apis: ["./routes/*.js"], // 👈 Make sure this path matches your route folder
 };

@@ -1,9 +1,30 @@
-const Business = require("../models/Business.js");
+const Business = require("../models/Business");
 
-// 🏢 Register a new business
+/**
+ * @desc Register a new business (only Seller or CA can do this)
+ * @route POST /api/business/register
+ * @access Private (Seller, CA)
+ */
 const registerBusiness = async (req, res) => {
   try {
-    const business = new Business(req.body);
+    // ✅ Ensure user is authenticated and attached by middleware
+    console.log("🔐 Inside registerBusiness, req.user:", req.user);
+
+      console.log("🟩 Headers received:", req.headers);
+    console.log("🟦 Authenticated user:", req.user);
+    console.log("🟨 Body received:", req.body);
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: "Unauthorized - User not found in token" });
+    }
+
+    // ✅ Create new business entry
+    const business = new Business({
+      ...req.body,
+      userId: req.user._id,  // Automatically set from logged-in user   // Default false until admin verifies
+    });
+
+    // console.log("Authenticated User:", req.user);
+
     await business.save();
 
     res.status(201).json({
@@ -11,33 +32,61 @@ const registerBusiness = async (req, res) => {
       business,
     });
   } catch (error) {
-    console.error("Error registering business:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Business Registration Error:", error);
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
+
+
 
 // 💰 Add auction details
 const addAuctionDetails = async (req, res) => {
   try {
     const { businessId } = req.params;
+    const { startingBidAmount, startTime, endTime } = req.body;
+
+    // Find business
     const business = await Business.findById(businessId);
 
     if (!business) {
       return res.status(404).json({ message: "Business not found" });
     }
 
-    business.auctionDetails = req.body;
-    await business.save();
+    // Add auction details
+    business.auctionDetails = {
+      startingBidAmount,
+      startTime,
+      endTime,
+    };
 
-    res.json({
+    // Ensure verified exists (default false)
+    if (business.verified === undefined) {
+      business.verified = false;
+    }
+
+    // Save updated business
+    const updatedBusiness = await business.save();
+
+    // 🔹 Convert to plain object so all fields (like verified) show up
+    const plainBusiness = updatedBusiness.toObject({ getters: true, versionKey: false });
+
+    // Respond
+    res.status(200).json({
       message: "Auction details added successfully!",
-      business,
+      business: plainBusiness,
     });
+
   } catch (error) {
     console.error("Error adding auction details:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: "Server error" });
   }
 };
+
+
+
 
 // 📂 Upload business documents
 const uploadBusinessDocuments = async (req, res) => {
@@ -69,12 +118,13 @@ const uploadBusinessDocuments = async (req, res) => {
 const getAllBusinesses = async (req, res) => {
   try {
     const businesses = await Business.find().sort({ createdAt: -1 });
-    res.json(businesses);
+    res.status(200).json(businesses);
   } catch (error) {
     console.error("Error fetching businesses:", error);
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
 
 // 🔍 Get single business by ID
 const getBusinessById = async (req, res) => {

@@ -1,25 +1,49 @@
 const mongoose = require("mongoose");
 
+// 🔹 Directors Schema
 const directorSchema = new mongoose.Schema({
-  name: String,
-  DIN: String,
-  role: String,
-  appointedOn: Date,
+  name: { type: String, required: true },
+  DIN: { type: String },
+  role: { type: String },
+  appointedOn: { type: Date },
   isSignatory: { type: Boolean, default: false },
 });
 
+// 🔹 Document Schema
 const documentSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ["image", "financial", "itr", "certificate", "additional"],
+    required: true,
   },
-  name: String,
-  url: String, // Supabase or Cloudinary URL
+  name: { type: String, required: true },
+  url: { type: String, required: true }, // Cloudinary / Supabase URL
+  uploadedAt: { type: Date, default: Date.now },
 });
 
+// 🔹 Important Dates Schema
+const importantDatesSchema = new mongoose.Schema({
+  agmDate: { type: Date },
+  balanceSheetFilingDate: { type: Date },
+  annualReturnFilingDate: { type: Date },
+});
+
+// 🔹 Auction Details Schema
+const auctionDetailsSchema = new mongoose.Schema({
+  startingBidAmount: { type: Number, required: true },
+  startTime: { type: Date, required: true },
+  endTime: { type: Date, required: true },
+  createdAt: { type: Date, default: Date.now },
+   verified: {
+      type: Boolean,
+      default: false, // by default business is unverified
+    }
+});
+
+// 🔹 Main Business Listing Schema
 const businessListingSchema = new mongoose.Schema(
   {
-    // 🔹 Step 1: Company Information
+    // ✅ Company Info
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -28,16 +52,36 @@ const businessListingSchema = new mongoose.Schema(
     CIN: { type: String, required: true },
     companyName: { type: String, required: true },
     ROC: { type: String },
-    registrationNumber: { type: String },
+    registrationNumber: { type: String, required: true },
     registeredAddress: { type: String },
     subCategory: { type: String },
     classOfCompany: { type: String },
     categoryOfCompany: { type: String },
+
+    // ✅ Listing Info
+    listedInStockExchange: { type: Boolean, default: false },
     listedStockExchange: { type: String },
+
+    // ✅ Financial Info
     authorizedCapital: { type: Number },
     paidUpCapital: { type: Number },
+
+    // ✅ Dates
     dateOfIncorporation: { type: Date },
     dateOfBalanceSheet: { type: Date },
+    importantDates: importantDatesSchema,
+    
+
+    // ✅ Directors / Signatories
+    directors: [directorSchema],
+
+    // ✅ Auction Details (managed separately via /auction route)
+    auctionDetails: [auctionDetailsSchema],
+
+    // ✅ Uploaded Documents (managed separately via /documents route)
+    documents: [documentSchema],
+
+    // ✅ Status & Description
     companyStatus: {
       type: String,
       enum: ["Active", "Inactive", "Strike Off", "Liquidated"],
@@ -45,23 +89,19 @@ const businessListingSchema = new mongoose.Schema(
     },
     description: { type: String },
 
-    directors: [directorSchema],
 
-    // 🔹 Step 2: Auction Details
-    auctionDetails: {
-      startingBidAmount: { type: Number, required: false },
-      startTime: { type: Date },
-      endTime: { type: Date },
-    },
+  
 
-    // 🔹 Step 3: Uploaded Documents
-    documents: [documentSchema],
-
-    // 🔹 Meta
+    // ✅ Metadata
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("businesses", businessListingSchema);
+businessListingSchema.set("toJSON", { virtuals: true });
+businessListingSchema.set("toObject", { virtuals: true });
+
+
+module.exports = mongoose.model("Business", businessListingSchema, "businesses");
+

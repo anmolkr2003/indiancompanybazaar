@@ -4,6 +4,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const { authenticate, authorize } = require('./middleware/authMiddleware');
+
 
 const swaggerDocs = require('./swagger/swagger'); // ✅ Import only this function
 
@@ -31,12 +33,13 @@ const buyerRoutes = require("./routes/buyerRoutes");
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/business', businessRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/orders', orderRoutes);
-app.use("/api/buyer", buyerRoutes);
+app.use('/api/admin',authenticate, authorize('admin'), adminRoutes);
+app.use('/api/orders',authenticate, orderRoutes);
+app.use("/api/buyer",authenticate, buyerRoutes);
 
 // ✅ Initialize Swagger properly (only once)
 swaggerDocs(app);
+// app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
 
 app.get('/', (req, res) => res.send({ ok: true, message: 'Business marketplace backend' }));
 

@@ -27,7 +27,7 @@ const router = express.Router();
 
 router.get("/business-listings", async (req, res) => {
   try {
-    const businesses = await Business.find({ verified: true });
+    const businesses = await Business.find().sort({ createdAt: -1 });
     res.status(200).json({ count: businesses.length, businesses });
   } catch (err) {
     console.error("Error fetching business listings:", err);

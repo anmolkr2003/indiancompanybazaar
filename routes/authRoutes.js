@@ -243,10 +243,11 @@ router.post("/login", async (req, res) => {
 
     // ✅ Include role inside JWT
     const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+  { id: user._id, email: user.email, role: user.role },
+  process.env.JWT_SECRET,
+  { expiresIn: "3d" }
+);
+
 
     // ✅ Don’t return password
     user.password = undefined;

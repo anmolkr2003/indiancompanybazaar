@@ -7,9 +7,10 @@ const {
   getBusinessById,
   deleteBusiness,
 } = require("../controllers/businessController");
-const Business = require("../models/Business.js"); 
-
+const Business = require("../models/Business.js");
 const upload = require("../middleware/upload");
+const { authenticate, authorize} = require("../middleware/authMiddleware.js");
+// const {authorizeRoles} = require("../middleware/roleMiddleware.js");
 
 const router = express.Router();
 
@@ -24,9 +25,14 @@ const router = express.Router();
  * @swagger
  * /api/business/register:
  *   post:
- *     summary: Register a new business
+ *     summary: Register a new business (Only Seller or CA can register)
  *     tags: [Business]
- *     description: Creates a new company listing and stores it in the database.
+ *     security:
+ *       - bearerAuth: []    # Requires JWT token
+ *     description: |
+ *       Creates a new business record in the system.  
+ *       Only users with roles **Seller** or **CA** can perform this action.  
+ *       By default, all newly created businesses will have `verified: false` until approved by an admin.
  *     requestBody:
  *       required: true
  *       content:
@@ -34,13 +40,9 @@ const router = express.Router();
  *           schema:
  *             type: object
  *             required:
- *               - userId
  *               - CIN
  *               - companyName
  *             properties:
- *               userId:
- *                 type: string
- *                 example: "671f26c18a82e03f06e2b4c1"
  *               CIN:
  *                 type: string
  *                 example: "U12345DL2020PTC123456"
@@ -50,40 +52,217 @@ const router = express.Router();
  *               ROC:
  *                 type: string
  *                 example: "Delhi"
+ *               registrationNumber:
+ *                 type: string
+ *                 example: "123456"
  *               registeredAddress:
  *                 type: string
  *                 example: "123 Business Street, New Delhi"
+ *               subCategory:
+ *                 type: string
+ *                 example: "Private Limited"
  *               categoryOfCompany:
  *                 type: string
- *                 example: "Private"
+ *                 example: "Company limited by shares"
  *               classOfCompany:
  *                 type: string
- *                 example: "Limited"
+ *                 example: "Private"
+ *               listedInStockExchange:
+ *                 type: boolean
+ *                 example: true
+ *               listedStockExchange:
+ *                 type: string
+ *                 example: "BSE"
  *               authorizedCapital:
  *                 type: number
  *                 example: 1000000
  *               paidUpCapital:
  *                 type: number
  *                 example: 500000
- *               description:
+ *               dateOfIncorporation:
  *                 type: string
- *                 example: "We manufacture electric vehicles."
+ *                 format: date
+ *                 example: "2022-07-15"
+ *               dateOfBalanceSheet:
+ *                 type: string
+ *                 format: date
+ *                 example: "2024-03-31"
+ *               importantDates:
+ *                 type: object
+ *                 properties:
+ *                   agmDate:
+ *                     type: string
+ *                     format: date
+ *                     example: "2024-09-30"
+ *                   annualReturnFilingDate:
+ *                     type: string
+ *                     format: date
+ *                     example: "2024-10-15"
+ *               directors:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                       example: "Rahul Kumar"
+ *                     DIN:
+ *                       type: string
+ *                       example: "09324567"
+ *                     role:
+ *                       type: string
+ *                       example: "Managing Director"
+ *                     appointedOn:
+ *                       type: string
+ *                       format: date
+ *                       example: "2021-08-10"
+ *                     isSignatory:
+ *                       type: boolean
+ *                       example: true
  *     responses:
  *       201:
  *         description: Business registered successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Business registered successfully!"
+ *                 business:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                       example: "6720a80f3f8b3a1d2e1a5b8f"
+ *                     companyName:
+ *                       type: string
+ *                       example: "ABC Pvt Ltd"
+ *                     CIN:
+ *                       type: string
+ *                       example: "U12345DL2020PTC123456"
+ *                     verified:
+ *                       type: boolean
+ *                       example: false
+ *                       description: "Indicates whether the business is verified by an admin (default: false)"
  *       400:
- *         description: Missing or invalid input
+ *         description: Bad Request – Missing or invalid input fields
+ *       401:
+ *         description: Unauthorized – Missing or invalid JWT token
+ *       403:
+ *         description: Forbidden – Only users with roles Seller or CA can access this route
  *       500:
- *         description: Internal server error
+ *         description: Internal Server Error
  */
 
-router.post("/register", registerBusiness);
+console.log("✅ Business routes loaded");
+
+router.post("/register", (req, res, next) => {
+  console.log("🟢 1️⃣ /register hit");
+  next();
+}, authenticate, (req, res, next) => {
+  console.log("🟢 2️⃣ After authenticate:", req.user ? "User attached" : "No user");
+  next();
+}, authorize("seller", "ca"), (req, res, next) => {
+  console.log("🟢 3️⃣ After authorize:", req.user ? req.user.email : "No user");
+  next();
+}, registerBusiness);
+
+
+
+
 
 /**
  * @swagger
  * /api/business/{businessId}/auction:
  *   post:
- *     summary: Add auction details for a business
+ *     summary: Add or update auction details (Only Seller or CA)
+ *     tags: [Business]
+ *     security:
+ *       - bearerAuth: []
+ *     description: |
+ *       Adds or updates auction information for a registered business.  
+ *       Only users with the role **Seller** or **CA** can manage auction details.  
+ *       The `verified` status of the business remains **false** until approved by admin.
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the business for which to add auction details.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - startingBidAmount
+ *               - startTime
+ *               - endTime
+ *             properties:
+ *               startingBidAmount:
+ *                 type: number
+ *                 example: 50000
+ *               startTime:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2025-10-29T10:00:00Z"
+ *               endTime:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2025-10-30T10:00:00Z"
+ *     responses:
+ *       200:
+ *         description: Auction details added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Auction details added successfully!"
+ *                 business:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     companyName:
+ *                       type: string
+ *                     verified:
+ *                       type: boolean
+ *                       example: false
+ *                       description: "Business remains unverified by default"
+ *                     auctionDetails:
+ *                       type: object
+ *                       properties:
+ *                         startingBidAmount:
+ *                           type: number
+ *                         startTime:
+ *                           type: string
+ *                           format: date-time
+ *                         endTime:
+ *                           type: string
+ *                           format: date-time
+ *       401:
+ *         description: Unauthorized - Invalid or missing token
+ *       403:
+ *         description: Forbidden - Only Seller or CA can add auction
+ *       404:
+ *         description: Business not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post("/:businessId/auction", addAuctionDetails);
+
+/**
+ * @swagger
+ * /api/business/{businessId}/documents:
+ *   post:
+ *     summary: Upload a document for a business
  *     tags: [Business]
  *     parameters:
  *       - in: path
@@ -95,96 +274,32 @@ router.post("/register", registerBusiness);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               startingBid:
- *                 type: number
- *                 example: 50000
- *               startTime:
- *                 type: string
- *                 example: "2025-10-29T10:00:00Z"
- *               endTime:
- *                 type: string
- *                 example: "2025-10-30T10:00:00Z"
- *     responses:
- *       200:
- *         description: Auction details added successfully
- *       404:
- *         description: Business not found
- */
-router.post("/:businessId/auction", addAuctionDetails);
-
-/**
- * @swagger
- * /api/business/{businessId}/documents:
- *   post:
- *     summary: Upload documents for a business
- *     tags:
- *       - Business
- *     parameters:
- *       - in: path
- *         name: businessId
- *         required: true
- *         schema:
- *           type: string
- *         description: The ID of the business to upload documents for
- *     requestBody:
- *       required: true
- *       content:
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - file
+ *               - type
+ *               - name
  *             properties:
  *               type:
  *                 type: string
- *                 example: "license"
+ *                 example: "certificate"
  *               name:
  *                 type: string
- *                 example: "Company License"
+ *                 example: "Certificate of Incorporation"
  *               file:
  *                 type: string
  *                 format: binary
  *     responses:
  *       200:
- *         description: Documents uploaded successfully
+ *         description: Document uploaded successfully
  *       404:
  *         description: Business not found
+ *       500:
+ *         description: Server error
  */
-router.post(
-  "/:businessId/documents",
-  upload.single("file"),
-  async (req, res) => {
-    try {
-      const { businessId } = req.params;
-      const { type, name } = req.body;
-
-      const business = await Business.findById(businessId);
-      if (!business) return res.status(404).json({ error: "Business not found" });
-
-      const document = {
-        type,
-        name,
-        url: req.file.path, // Cloudinary file URL
-      };
-
-      business.documents.push(document);
-      await business.save();
-
-      res.status(200).json({
-        message: "Document uploaded successfully",
-        document,
-      });
-    } catch (err) {
-      console.error("Error uploading document:", err);
-      res.status(500).json({ error: "Server error" });
-    }
-  }
-);
-
-module.exports = router;
-
+router.post("/:businessId/documents", upload.single("file"), uploadBusinessDocuments);
 
 /**
  * @swagger
@@ -195,6 +310,8 @@ module.exports = router;
  *     responses:
  *       200:
  *         description: List of all businesses
+ *       500:
+ *         description: Server error
  */
 router.get("/", getAllBusinesses);
 
@@ -210,11 +327,14 @@ router.get("/", getAllBusinesses);
  *         required: true
  *         schema:
  *           type: string
+ *         description: Business ID
  *     responses:
  *       200:
- *         description: Business details
+ *         description: Business details retrieved successfully
  *       404:
  *         description: Business not found
+ *       500:
+ *         description: Server error
  */
 router.get("/:businessId", getBusinessById);
 
@@ -222,7 +342,7 @@ router.get("/:businessId", getBusinessById);
  * @swagger
  * /api/business/{businessId}:
  *   delete:
- *     summary: Delete a business
+ *     summary: Delete a business by ID
  *     tags: [Business]
  *     parameters:
  *       - in: path
@@ -230,11 +350,14 @@ router.get("/:businessId", getBusinessById);
  *         required: true
  *         schema:
  *           type: string
+ *         description: Business ID
  *     responses:
  *       200:
  *         description: Business deleted successfully
  *       404:
  *         description: Business not found
+ *       500:
+ *         description: Server error
  */
 router.delete("/:businessId", deleteBusiness);
 

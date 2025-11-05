@@ -3,6 +3,7 @@ const router = express.Router();
 const { register, login } = require('../controllers/authController');
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const authenticate = require("../middleware/authMiddleware").authenticate;
 
 const User = require("../models/User");
 
@@ -270,15 +271,13 @@ router.post("/login", async (req, res) => {
 });
 
 
-
 /**
  * @swagger
  * /api/auth/set-role:
  *   post:
  *     summary: Set user role by email
- *     description: Update the user's role using their email address.
- *     tags:
- *       - Auth
+ *     description: Updates the user's role and returns a new JWT token.
+ *     tags: [Auth]
  *     requestBody:
  *       required: true
  *       content:
@@ -291,27 +290,50 @@ router.post("/login", async (req, res) => {
  *             properties:
  *               email:
  *                 type: string
- *                 example: "string@gmail.com"
+ *                 example: "string2@gmail.com"
  *               role:
  *                 type: string
- *                 enum: [buyer, seller, investor, admin]
- *                 example: "seller"
+ *                 enum: [buyer, seller, investor, ca, admin]
+ *                 example: "ca"
  *     responses:
  *       200:
- *         description: Role updated successfully
- *       400:
- *         description: Missing email or role
- *       404:
- *         description: User not found
- *       500:
- *         description: Server error
+ *         description: Role updated successfully and token returned
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Role updated successfully"
+ *                 token:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       example: "69079b94ac836a0bca6ad7fb"
+ *                     name:
+ *                       type: string
+ *                       example: "string"
+ *                     email:
+ *                       type: string
+ *                       example: "string2@gmail.com"
+ *                     role:
+ *                       type: string
+ *                       example: "ca"
  */
+
+
 router.post("/set-role", async (req, res) => {
   try {
     const { email, role } = req.body;
 
-    if (!email || !role)
+    if (!email || !role) {
       return res.status(400).json({ error: "Email and role are required" });
+    }
 
     const user = await User.findOneAndUpdate(
       { email },
@@ -319,11 +341,21 @@ router.post("/set-role", async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!user)
+    if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
 
+    // ✅ Generate a fresh JWT after updating the role
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // ✅ Send both token and user info in response
     res.status(200).json({
       message: "Role updated successfully",
+      token, // 👈 this is the missing part
       user: {
         id: user._id,
         name: user.name,
@@ -336,6 +368,15 @@ router.post("/set-role", async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 });
+
+
+
+
+
+
+
+
+
 
 
 

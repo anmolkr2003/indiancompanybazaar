@@ -5,40 +5,42 @@ const Business = require("../models/Business");
  * @route POST /api/business/register
  * @access Private (Seller, CA)
  */
+// controllers/businessController.js
 const registerBusiness = async (req, res) => {
   try {
-    // ✅ Ensure user is authenticated and attached by middleware
-    console.log("🔐 Inside registerBusiness, req.user:", req.user);
+    console.log("🟢 Register Business called by:", req.user?.email);
 
-      console.log("🟩 Headers received:", req.headers);
-    console.log("🟦 Authenticated user:", req.user);
-    console.log("🟨 Body received:", req.body);
     if (!req.user || !req.user._id) {
       return res.status(401).json({ message: "Unauthorized - User not found in token" });
     }
 
-    // ✅ Create new business entry
-    const business = new Business({
+    // ✅ Create business record with verified = false (explicit)
+    const business = await Business.create({
       ...req.body,
-      userId: req.user._id,  // Automatically set from logged-in user   // Default false until admin verifies
+      userId: req.user._id,
+      verified: false, // always false initially
     });
 
-    // console.log("Authenticated User:", req.user);
+    // ✅ Convert to plain JS object to ensure defaults appear
+    const plainBusiness = business.toObject({ getters: true, versionKey: false });
 
-    await business.save();
-
+    // ✅ Return structured JSON
     res.status(201).json({
-      message: "Business registered successfully!",
-      business,
-    });
+  message: "Business registered successfully!",
+  business: business.toObject({ getters: true, versionKey: false }),
+});
+
   } catch (error) {
-    console.error("Business Registration Error:", error);
+    console.error("❌ Business Registration Error:", error);
     res.status(500).json({
-      message: "Server error",
+      message: "Server error while registering business",
       error: error.message,
     });
   }
 };
+
+
+
 
 
 
@@ -117,11 +119,66 @@ const uploadBusinessDocuments = async (req, res) => {
 // 📋 Get all businesses
 const getAllBusinesses = async (req, res) => {
   try {
-    const businesses = await Business.find().sort({ createdAt: -1 });
-    res.status(200).json(businesses);
+    console.log("🔍 Fetching businesses for:", req.user?.role || "Public");
+
+    let filter = { verified: true }; // Default → only verified
+
+    // ✅ If logged in and user is admin or CA, show all
+    if (req.user && ["admin", "ca"].includes(req.user.role)) {
+      filter = {}; // Show all businesses
+    }
+
+    // ✅ Fetch businesses with filters
+    const businesses = await Business.find(filter)
+      .sort({ createdAt: -1 })
+      .populate("userId", "name email role"); // show basic user info
+
+    // ✅ Return response
+    res.status(200).json({
+      success: true,
+      count: businesses.length,
+      businesses,
+    });
   } catch (error) {
     console.error("Error fetching businesses:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching businesses",
+      error: error.message,
+    });
+  }
+};
+
+
+const getUnverifiedBusinesses = async (req, res) => {
+  try {
+    console.log("🔍 Fetching unverified businesses for:", req.user?.email);
+
+    // ✅ Allow only admin or CA
+    if (!req.user || !["admin", "ca"].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Forbidden — Only Admin or CA can view unverified businesses",
+      });
+    }
+
+    // ✅ Find unverified businesses
+    const unverified = await Business.find({ verified: false })
+      .sort({ createdAt: -1 })
+      .populate("userId", "name email role");
+
+    res.status(200).json({
+      success: true,
+      count: unverified.length,
+      unverified,
+    });
+  } catch (error) {
+    console.error("Error fetching unverified businesses:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching unverified businesses",
+      error: error.message,
+    });
   }
 };
 
@@ -142,6 +199,8 @@ const getBusinessById = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
+
+
 
 // ❌ Delete a business
 const deleteBusiness = async (req, res) => {

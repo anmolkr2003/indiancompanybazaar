@@ -33,11 +33,7 @@ const auctionDetailsSchema = new mongoose.Schema({
   startingBidAmount: { type: Number, required: true },
   startTime: { type: Date, required: true },
   endTime: { type: Date, required: true },
-  createdAt: { type: Date, default: Date.now },
-   verified: {
-      type: Boolean,
-      default: false, // by default business is unverified
-    }
+  createdAt: { type: Date, default: Date.now }
 });
 
 // 🔹 Main Business Listing Schema
@@ -89,7 +85,15 @@ const businessListingSchema = new mongoose.Schema(
     },
     description: { type: String },
 
-
+    verified: {
+    type: Boolean,
+    default: false, // initially unverified
+  },
+  verifiedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User", // admin who verified
+  },
+  verifiedAt: { type: Date },
   
 
     // ✅ Metadata

@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Bid = require("../models/Bid");
 const Business = require("../models/Business");
 const User = require("../models/User");
+const { authorize, authenticate } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ const router = express.Router();
  *         description: List of active business listings
  */
 
-router.get("/business-listings", async (req, res) => {
+router.get("/business-listings",authenticate, authorize('buyer'), async (req, res) => {
   try {
     const businesses = await Business.find().sort({ createdAt: -1 });
     res.status(200).json({ count: businesses.length, businesses });
@@ -40,10 +41,11 @@ router.get("/business-listings", async (req, res) => {
  * @swagger
  * /api/buyer/place-bid:
  *   post:
- *     summary: Place a bid on a business listing
- *     description: Allows a buyer to place a bid on an active business listing by providing buyerId, companyId, and bid amount.
- *     tags:
- *       - Buyer
+ *     summary: Place a bid for a company
+ *     description: Allows a logged-in buyer to place a bid on a business listing. The buyer ID is automatically extracted from the JWT token.
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []       # 👈 Required for token-based access
  *     requestBody:
  *       required: true
  *       content:
@@ -51,22 +53,17 @@ router.get("/business-listings", async (req, res) => {
  *           schema:
  *             type: object
  *             required:
- *               - buyerId
  *               - companyId
  *               - amount
  *             properties:
- *               buyerId:
- *                 type: string
- *                 example: "68f50db408d42413b6a21fd"
- *                 description: MongoDB ObjectId of the buyer (User ID)
  *               companyId:
  *                 type: string
- *                 example: "68f50db508d42413b6a21fe"
- *                 description: MongoDB ObjectId of the company/business being bid on
+ *                 description: The ID of the company/business being bid on
+ *                 example: "671df8d4f8a36e1234567890"
  *               amount:
  *                 type: number
- *                 example: 25000
- *                 description: Amount being bid by the buyer
+ *                 description: The bid amount
+ *                 example: 55000
  *     responses:
  *       201:
  *         description: Bid placed successfully
@@ -77,27 +74,27 @@ router.get("/business-listings", async (req, res) => {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: Bid placed successfully
+ *                   example: "Bid placed successfully"
  *                 bid:
  *                   type: object
  *                   properties:
- *                     _id:
+ *                     id:
  *                       type: string
- *                       example: "674e1c456a9a1f9b2f94a2bc"
- *                     buyer:
- *                       type: string
- *                       example: "68f50db408d42413b6a21fd"
+ *                       example: "675b09f92abf4f123456789a"
  *                     company:
  *                       type: string
- *                       example: "68f50db508d42413b6a21fe"
+ *                       example: "Tata Motors Ltd"
  *                     amount:
  *                       type: number
- *                       example: 25000
- *                     createdAt:
+ *                       example: 55000
+ *                     status:
  *                       type: string
- *                       format: date-time
+ *                       example: "Active"
+ *                     buyer:
+ *                       type: string
+ *                       example: "Anmol Singh"
  *       400:
- *         description: Invalid input data
+ *         description: Bad request — missing or invalid fields
  *         content:
  *           application/json:
  *             schema:
@@ -105,9 +102,9 @@ router.get("/business-listings", async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: Invalid buyerId or companyId
- *       404:
- *         description: Buyer or company not found
+ *                   example: "companyId and amount are required"
+ *       401:
+ *         description: Unauthorized — missing or invalid token
  *         content:
  *           application/json:
  *             schema:
@@ -115,9 +112,19 @@ router.get("/business-listings", async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: Buyer or Company not found
+ *                   example: "No token provided"
+ *       403:
+ *         description: Forbidden — not a buyer account
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   example: "Access denied for this role"
  *       500:
- *         description: Server error while placing bid
+ *         description: Internal server error
  *         content:
  *           application/json:
  *             schema:
@@ -125,44 +132,47 @@ router.get("/business-listings", async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: Server error while placing bid
+ *                   example: "Server error while placing bid"
  */
 
-
-router.post("/place-bid", async (req, res) => {
+router.post("/place-bid", authenticate, authorize("buyer"), async (req, res) => {
   try {
-    const { buyerId, companyId, amount } = req.body;
+    const { companyId, amount } = req.body;
+    const buyerId = req.user._id; // ✅ Logged-in buyer ID from token
 
     // ✅ Validate input
-    if (!buyerId || !companyId || !amount)
-      return res.status(400).json({ error: "All fields are required" });
-
-    if (
-      !mongoose.Types.ObjectId.isValid(buyerId) ||
-      !mongoose.Types.ObjectId.isValid(companyId)
-    ) {
-      return res.status(400).json({ error: "Invalid buyerId or companyId" });
+    if (!companyId || !amount) {
+      return res.status(400).json({ error: "companyId and amount are required" });
     }
 
-    // ✅ Fetch buyer and company
+    if (!mongoose.Types.ObjectId.isValid(companyId)) {
+      return res.status(400).json({ error: "Invalid companyId" });
+    }
+
+    // ✅ Fetch buyer & company from DB to validate existence
     const buyer = await User.findById(buyerId);
     const company = await Business.findById(companyId);
 
-    if (!buyer || !company)
+    if (!buyer || !company) {
       return res.status(404).json({ error: "Buyer or Company not found" });
+    }
 
-    // ✅ Create a new bid
-    const newBid = new Bid({
+    // ✅ Create and save bid
+    const newBid = await Bid.create({
       buyer: buyerId,
       company: companyId,
       amount,
     });
 
-    await newBid.save();
-
     res.status(201).json({
       message: "Bid placed successfully",
-      bid: newBid,
+      bid: {
+        id: newBid._id,
+        company: company.name,
+        amount: newBid.amount,
+        status: newBid.status,
+        buyer: buyer.name,
+      },
     });
   } catch (error) {
     console.error("Error placing bid:", error);
@@ -171,61 +181,61 @@ router.post("/place-bid", async (req, res) => {
 });
 
 
+// ====================
+// 📋 Get all bids placed by logged-in buyer
+// ====================
+
 /**
  * @swagger
- * /api/buyer/bids/{buyerId}:
+ * /api/buyer/my-bids:
  *   get:
- *     summary: Get all bids placed by a specific buyer
- *     description: Fetch all bids associated with the given buyer ID. Each bid includes company and buyer details.
- *     tags:
- *       - Buyer
- *     parameters:
- *       - in: path
- *         name: buyerId
- *         required: true
- *         schema:
- *           type: string
- *           example: 66f50db408d42413b6a21fd2
- *         description: The ObjectId of the buyer
+ *     summary: Get all bids placed by the logged-in buyer
+ *     description: Returns all bids placed by the currently authenticated buyer. Automatically extracts buyer ID from JWT token.
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []    # Token required
  *     responses:
  *       200:
  *         description: List of bids fetched successfully
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   _id:
- *                     type: string
- *                     example: 671d4cdd21e74c8b762e1f0a
- *                   amount:
- *                     type: number
- *                     example: 25000
- *                   buyer:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 count:
+ *                   type: number
+ *                   example: 2
+ *                 bids:
+ *                   type: array
+ *                   items:
  *                     type: object
  *                     properties:
  *                       _id:
  *                         type: string
- *                         example: 66f50db408d42413b6a21fd2
- *                       name:
+ *                         example: 671d4cdd21e74c8b762e1f0a
+ *                       amount:
+ *                         type: number
+ *                         example: 25000
+ *                       status:
  *                         type: string
- *                         example: Rahul Kumar
- *                   company:
- *                     type: object
- *                     properties:
- *                       _id:
+ *                         example: Active
+ *                       company:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                             example: 671d4b2f6aa1eecb31f7c8e3
+ *                           name:
+ *                             type: string
+ *                             example: ABC Tech Pvt Ltd
+ *                       createdAt:
  *                         type: string
- *                         example: 671d4b2f6aa1eecb31f7c8e3
- *                       name:
- *                         type: string
- *                         example: ABC Tech Pvt Ltd
- *                   createdAt:
- *                     type: string
- *                     example: 2025-10-30T12:00:00.000Z
- *       400:
- *         description: Invalid buyerId format
+ *                         example: 2025-11-05T12:00:00.000Z
+ *       401:
+ *         description: Unauthorized — missing or invalid token
  *         content:
  *           application/json:
  *             schema:
@@ -233,7 +243,7 @@ router.post("/place-bid", async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: Invalid buyerId format
+ *                   example: No token provided
  *       500:
  *         description: Server error while fetching bids
  *         content:
@@ -243,28 +253,28 @@ router.post("/place-bid", async (req, res) => {
  *               properties:
  *                 error:
  *                   type: string
- *                   example: Error fetching bids
+ *                   example: Server error while fetching bids
  */
 
-
-router.get("/bids/:buyerId", async (req, res) => {
+router.get("/my-bids", authenticate, authorize("buyer"), async (req, res) => {
   try {
-    const { buyerId } = req.params;
+    const buyerId = req.user._id; // ✅ from JWT token
 
-    if (!mongoose.Types.ObjectId.isValid(buyerId)) {
-      return res.status(400).json({ error: "Invalid buyerId format" });
-    }
+    const bids = await Bid.find({ buyer: buyerId })
+      .populate("company", "name category") // get company details
+      .populate("buyer", "name email");     // get buyer details (yourself)
 
-    const bids = await Bid.find({ buyer: new mongoose.Types.ObjectId(buyerId) })
-      .populate("company")
-      .populate("buyer");
-
-    res.status(200).json(bids);
+    res.status(200).json({
+      success: true,
+      count: bids.length,
+      bids,
+    });
   } catch (error) {
-    console.error("Error fetching bids:", error);
-    res.status(500).json({ error: "Error fetching bids" });
+    console.error("Error fetching buyer bids:", error);
+    res.status(500).json({ error: "Server error while fetching bids" });
   }
 });
+
 
 
 /**
@@ -304,6 +314,79 @@ router.put("/update-bid/:bidId", async (req, res) => {
   } catch (err) {
     console.error("Error updating bid:", err);
     res.status(500).json({ error: "Server error while updating bid" });
+  }
+});
+
+
+/**
+ * @swagger
+ * /api/buyer/won-bids:
+ *   get:
+ *     summary: Get all won bids for the logged-in buyer
+ *     description: Returns a list of bids with status 'Accepted' or 'Paid' belonging to the current buyer.
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of won bids
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 count:
+ *                   type: number
+ *                 wonBids:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       bidId:
+ *                         type: string
+ *                         example: "675b08d12abf4f..."
+ *                       amount:
+ *                         type: number
+ *                         example: 50000
+ *                       status:
+ *                         type: string
+ *                         example: "Accepted"
+ *                       company:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ */
+router.get("/won-bids",authenticate, authorize(["buyer"]), async (req, res) => {
+  try {
+    const buyerId = req.user._id;
+
+    // Find bids belonging to this buyer that are accepted or paid
+    const wonBids = await Bid.find({
+      buyer: buyerId,
+      status: { $in: ["Accepted", "Paid"] },
+    }).populate("company", "name");
+
+    res.status(200).json({
+      success: true,
+      count: wonBids.length,
+      wonBids: wonBids.map(bid => ({
+        bidId: bid._id,
+        amount: bid.amount,
+        status: bid.status,
+        company: bid.company ? bid.company.name : "Unknown",
+      })),
+    });
+  } catch (err) {
+    console.error("Error fetching won bids:", err);
+    res.status(500).json({
+      success: false,
+      error: "Server error while fetching won bids",
+    });
   }
 });
 

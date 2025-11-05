@@ -3,28 +3,33 @@ const User = require("../models/User");
 
 exports.authenticate = async (req, res, next) => {
   try {
-    console.log("🟡 Incoming request to:", req.originalUrl);
-    console.log("🟡 AUTH HEADER:", req.headers.authorization);
-
+    // 🟡 Get token from the Authorization header
     const authHeader = req.headers.authorization;
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      console.log("❌ No valid Authorization header found");
-      return res.status(401).json({ message: "No token provided" });
+      return res.status(401).json({ error: "No token provided" });
     }
 
+    // Extract token
     const token = authHeader.split(" ")[1];
-    console.log("🟡 TOKEN EXTRACTED:", token);
 
+    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("🟢 DECODED TOKEN:", decoded);
+    if (!decoded || !decoded.id) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
 
-    req.user = await User.findById(decoded.id).select("-password");
-    console.log("🟢 USER ATTACHED:", req.user ? req.user._id : "No user found");
+    // 🟢 Find user and attach to req.user
+    const user = await User.findById(decoded.id).select("-password");
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
 
+    req.user = user; // ✅ available in all protected routes
     next();
   } catch (err) {
-    console.error("🔥 AUTH ERROR:", err.message);
-    return res.status(401).json({ message: "Invalid or expired token" });
+    console.error("❌ Auth error:", err.message);
+    res.status(401).json({ error: "Invalid or expired token" });
   }
 };
 

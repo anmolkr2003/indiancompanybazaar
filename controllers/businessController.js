@@ -10,25 +10,28 @@ const registerBusiness = async (req, res) => {
   try {
     console.log("🟢 Register Business called by:", req.user?.email);
 
+    // ✅ Check if logged in
     if (!req.user || !req.user._id) {
       return res.status(401).json({ message: "Unauthorized - User not found in token" });
     }
 
-    // ✅ Create business record with verified = false (explicit)
+    // ✅ Ensure only sellers can register a business
+    if (req.user.role !== "seller") {
+      return res.status(403).json({ message: "Only sellers can register a business" });
+    }
+
+    // ✅ Create business record and link to seller
     const business = await Business.create({
       ...req.body,
-      userId: req.user._id,
-      verified: false, // always false initially
+      seller: req.user._id, // 👈 FIX: use seller instead of userId
+      verified: false,      // always false initially
     });
 
-    // ✅ Convert to plain JS object to ensure defaults appear
-    const plainBusiness = business.toObject({ getters: true, versionKey: false });
-
-    // ✅ Return structured JSON
+    // ✅ Return structured JSON response
     res.status(201).json({
-  message: "Business registered successfully!",
-  business: business.toObject({ getters: true, versionKey: false }),
-});
+      message: "Business registered successfully!",
+      business: business.toObject({ getters: true, versionKey: false }),
+    });
 
   } catch (error) {
     console.error("❌ Business Registration Error:", error);

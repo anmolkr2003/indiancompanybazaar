@@ -40,7 +40,7 @@ const auctionDetailsSchema = new mongoose.Schema({
 const businessListingSchema = new mongoose.Schema(
   {
     // ✅ Company Info
-    userId: {
+    seller: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -84,6 +84,8 @@ const businessListingSchema = new mongoose.Schema(
       default: "Active",
     },
     description: { type: String },
+
+    
 
     verified: {
     type: Boolean,

@@ -1,9 +1,10 @@
 // 🧰 Optional static helper to find all won bids for a buyer
 // models/Bid.js
 const mongoose = require("mongoose");
+const Business = require("./Business");
 
 const bidSchema = new mongoose.Schema({
-  company: {
+  business: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Business",
     required: true,
@@ -16,8 +17,8 @@ const bidSchema = new mongoose.Schema({
   amount: { type: Number, required: true },
   status: {
     type: String,
-    enum: ["Active", "Accepted", "Rejected", "Expired", "Paid"],
-    default: "Active",
+     enum: ["pending", "active", "accepted", "rejected", "won", "lost", "paid"],
+    default: "pending",
   },
   isWon: {
     type: Boolean,

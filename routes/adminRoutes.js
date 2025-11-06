@@ -137,6 +137,59 @@ router.put('/verify/:id', adminController.verify);
  */
 router.put('/reject/:id', adminController.reject);
 
+/**
+ * @swagger
+ * /api/admin/bids/{bidId}/accept:
+ *   put:
+ *     summary: Accept a specific bid (Admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bidId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: 6721f6b9a1e3a2d2a9b6f7c1
+ *     responses:
+ *       200:
+ *         description: Bid accepted successfully
+ *       400:
+ *         description: Only active bids can be accepted
+ *       404:
+ *         description: Bid not found
+ *       500:
+ *         description: Server error
+ */
+router.put("/bids/:bidId/accept", authenticate, authorize("admin", "ca"), adminController.acceptBid);
+
+/**
+ * @swagger
+ * /api/admin/bids/{bidId}/reject:
+ *   put:
+ *     summary: Reject a specific bid (Admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bidId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: 6721f6b9a1e3a2d2a9b6f7c1
+ *     responses:
+ *       200:
+ *         description: Bid rejected successfully
+ *       400:
+ *         description: Only active bids can be rejected
+ *       404:
+ *         description: Bid not found
+ *       500:
+ *         description: Server error
+ */
+router.put("/bids/:bidId/reject", authenticate, authorize("admin", "ca"), adminController.rejectBid);
 
 
 module.exports = router;

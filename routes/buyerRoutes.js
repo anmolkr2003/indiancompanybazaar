@@ -1,9 +1,15 @@
 const express = require("express");
-const mongoose = require("mongoose");
-const Bid = require("../models/Bid");
+const { authenticate } = require("../middleware/authMiddleware");
 const Business = require("../models/Business");
-const User = require("../models/User");
-const { authorize, authenticate } = require("../middleware/authMiddleware");
+const Bid = require("../models/Bid");
+const BuyerWishlist = require("../models/wishlist");
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 const router = express.Router();
 
@@ -14,6 +20,9 @@ const router = express.Router();
  *   description: Buyer related operations
  */
 
+/* -------------------------------------------------------------------------- */
+/* 🏢 BUSINESS LISTINGS - Get all active listings                             */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @swagger
@@ -21,31 +30,40 @@ const router = express.Router();
  *   get:
  *     summary: Get all active business listings available for sale
  *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: List of active business listings
+ *         description: List of active businesses
  */
-
-router.get("/business-listings",authenticate, authorize('buyer'), async (req, res) => {
+router.get("/business-listings", authenticate, async (req, res) => {
   try {
-    const businesses = await Business.find().sort({ createdAt: -1 });
-    res.status(200).json({ count: businesses.length, businesses });
-  } catch (err) {
-    console.error("Error fetching business listings:", err);
-    res.status(500).json({ error: "Server error while fetching business listings" });
+    const listings = await Business.find({ verified: true })
+      .populate("seller", "name email")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: listings.length,
+      businesses: listings,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 
+/* -------------------------------------------------------------------------- */
+/* 💸 PLACE A BID                                                             */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @swagger
  * /api/buyer/place-bid:
  *   post:
  *     summary: Place a bid for a company
- *     description: Allows a logged-in buyer to place a bid on a business listing. The buyer ID is automatically extracted from the JWT token.
  *     tags: [Buyer]
  *     security:
- *       - bearerAuth: []       # 👈 Required for token-based access
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -53,150 +71,211 @@ router.get("/business-listings",authenticate, authorize('buyer'), async (req, re
  *           schema:
  *             type: object
  *             required:
- *               - companyId
+ *               - businessId
  *               - amount
  *             properties:
- *               companyId:
+ *               businessId:
  *                 type: string
- *                 description: The ID of the company/business being bid on
- *                 example: "671df8d4f8a36e1234567890"
+ *                 example: "6730a9cf4f8b1e1c6a96d333"
  *               amount:
  *                 type: number
- *                 description: The bid amount
- *                 example: 55000
+ *                 example: 12000000
  *     responses:
  *       201:
  *         description: Bid placed successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Bid placed successfully"
- *                 bid:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                       example: "675b09f92abf4f123456789a"
- *                     company:
- *                       type: string
- *                       example: "Tata Motors Ltd"
- *                     amount:
- *                       type: number
- *                       example: 55000
- *                     status:
- *                       type: string
- *                       example: "Active"
- *                     buyer:
- *                       type: string
- *                       example: "Anmol Singh"
- *       400:
- *         description: Bad request — missing or invalid fields
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "companyId and amount are required"
- *       401:
- *         description: Unauthorized — missing or invalid token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "No token provided"
- *       403:
- *         description: Forbidden — not a buyer account
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Access denied for this role"
- *       500:
- *         description: Internal server error
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: "Server error while placing bid"
  */
-
-router.post("/place-bid", authenticate, authorize("buyer"), async (req, res) => {
+router.post("/place-bid", authenticate, async (req, res) => {
   try {
-    const { companyId, amount } = req.body;
-    const buyerId = req.user._id; // ✅ Logged-in buyer ID from token
+    if (req.user.role !== "buyer")
+      return res.status(403).json({ message: "Only buyers can place bids" });
 
-    // ✅ Validate input
-    if (!companyId || !amount) {
-      return res.status(400).json({ error: "companyId and amount are required" });
-    }
+    const { businessId, amount } = req.body;
+    const buyerId = req.user._id;
 
-    if (!mongoose.Types.ObjectId.isValid(companyId)) {
-      return res.status(400).json({ error: "Invalid companyId" });
-    }
+    const business = await Business.findById(businessId);
+    if (!business)
+      return res.status(404).json({ message: "Business not found" });
 
-    // ✅ Fetch buyer & company from DB to validate existence
-    const buyer = await User.findById(buyerId);
-    const company = await Business.findById(companyId);
+    const bid = await Bid.create({
+  buyer: req.user._id,
+  business: req.body.businessId,
+  amount: req.body.amount,
+  status: "pending",
+});
 
-    if (!buyer || !company) {
-      return res.status(404).json({ error: "Buyer or Company not found" });
-    }
-
-    // ✅ Create and save bid
-    const newBid = await Bid.create({
-      buyer: buyerId,
-      company: companyId,
-      amount,
-    });
-
-    res.status(201).json({
-      message: "Bid placed successfully",
-      bid: {
-        id: newBid._id,
-        company: company.name,
-        amount: newBid.amount,
-        status: newBid.status,
-        buyer: buyer.name,
-      },
-    });
+    res.status(201).json({ message: "Bid placed successfully", bid });
   } catch (error) {
-    console.error("Error placing bid:", error);
-    res.status(500).json({ error: "Server error while placing bid" });
+    res.status(500).json({ message: error.message });
   }
 });
 
-
-// ====================
-// 📋 Get all bids placed by logged-in buyer
-// ====================
+/* -------------------------------------------------------------------------- */
+/* 📜 VIEW ALL BUYER BIDS                                                     */
+/* -------------------------------------------------------------------------- */
 
 /**
  * @swagger
  * /api/buyer/my-bids:
  *   get:
  *     summary: Get all bids placed by the logged-in buyer
- *     description: Returns all bids placed by the currently authenticated buyer. Automatically extracts buyer ID from JWT token.
  *     tags: [Buyer]
  *     security:
- *       - bearerAuth: []    # Token required
+ *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: List of bids fetched successfully
+ *         description: List of all bids placed by buyer
+ */
+router.get("/my-bids", authenticate, async (req, res) => {
+  try {
+    const bids = await Bid.find({ buyer: req.user._id })
+      .populate("business", "name category price location")
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ success: true, count: bids.length, bids });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* ✏️ UPDATE BID                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @swagger
+ * /api/buyer/update-bid/{bidId}:
+ *   put:
+ *     summary: Update a bid
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: bidId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 example: 13000000
+ *     responses:
+ *       200:
+ *         description: Bid updated successfully
+ */
+router.put("/update-bid/:bidId", authenticate, async (req, res) => {
+  try {
+    const { bidId } = req.params;
+    const { amount } = req.body;
+
+    const updatedBid = await Bid.findOneAndUpdate(
+      { _id: bidId, buyer: req.user._id },
+      { amount },
+      { new: true }
+    );
+
+    if (!updatedBid)
+      return res.status(404).json({ message: "Bid not found or unauthorized" });
+
+    res.status(200).json({ message: "Bid updated successfully", bid: updatedBid });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* 🏆 WON BIDS - Bids where buyer won                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @swagger
+ * /api/buyer/won-bids:
+ *   get:
+ *     summary: Get all won bids for the logged-in buyer
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of all won bids
+ */
+router.get("/won-bids", authenticate, async (req, res) => {
+  try {
+    const wonBids = await Bid.find({ buyer: req.user._id, status: "won" })
+      .populate("business", "name category price location");
+
+    res.status(200).json({ success: true, wonBids });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* ❌ CANCEL BID                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @swagger
+ * /api/buyer/cancel-bid/{bidId}:
+ *   delete:
+ *     summary: Cancel a bid
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - name: bidId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Bid cancelled successfully
+ */
+router.delete("/cancel-bid/:bidId", authenticate, async (req, res) => {
+  try {
+    const { bidId } = req.params;
+
+    const deleted = await Bid.findOneAndDelete({ _id: bidId, buyer: req.user._id });
+    if (!deleted)
+      return res.status(404).json({ message: "Bid not found or unauthorized" });
+
+    res.status(200).json({ message: "Bid cancelled successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* 💳 PAY FOR ACCEPTED BID                                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @swagger
+ * /api/buyer/pay/{bidId}:
+ *   post:
+ *     summary: Initiate payment for a winning bid
+ *     description: Creates a Razorpay order for the bid amount so the buyer can pay online.
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bidId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: "6730a9cf4f8b1e1c6a96d333"
+ *         description: ID of the bid to be paid
+ *     responses:
+ *       200:
+ *         description: Razorpay order created successfully
  *         content:
  *           application/json:
  *             schema:
@@ -205,131 +284,109 @@ router.post("/place-bid", authenticate, authorize("buyer"), async (req, res) => 
  *                 success:
  *                   type: boolean
  *                   example: true
- *                 count:
- *                   type: number
- *                   example: 2
- *                 bids:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       _id:
- *                         type: string
- *                         example: 671d4cdd21e74c8b762e1f0a
- *                       amount:
- *                         type: number
- *                         example: 25000
- *                       status:
- *                         type: string
- *                         example: Active
- *                       company:
- *                         type: object
- *                         properties:
- *                           _id:
- *                             type: string
- *                             example: 671d4b2f6aa1eecb31f7c8e3
- *                           name:
- *                             type: string
- *                             example: ABC Tech Pvt Ltd
- *                       createdAt:
- *                         type: string
- *                         example: 2025-11-05T12:00:00.000Z
- *       401:
- *         description: Unauthorized — missing or invalid token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
+ *                 key:
  *                   type: string
- *                   example: No token provided
+ *                   example: rzp_test_abc123xyz
+ *                 order_id:
+ *                   type: string
+ *                   example: order_Fg83jsljf938sL
+ *                 amount:
+ *                   type: integer
+ *                   example: 1500000
+ *                 currency:
+ *                   type: string
+ *                   example: INR
+ *                 bidId:
+ *                   type: string
+ *                   example: 6730a9cf4f8b1e1c6a96d333
+ *                 businessName:
+ *                   type: string
+ *                   example: "TechCorp Pvt. Ltd."
+ *       400:
+ *         description: Only winning bids can be paid
+ *       404:
+ *         description: Bid not found
  *       500:
- *         description: Server error while fetching bids
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Server error while fetching bids
+ *         description: Payment initialization failed
  */
-
-router.get("/my-bids", authenticate, authorize("buyer"), async (req, res) => {
+router.post("/pay/:bidId", async (req, res) => {
   try {
-    const buyerId = req.user._id; // ✅ from JWT token
+    const { bidId } = req.params;
+    const bid = await Bid.findById(bidId).populate("business");
 
-    const bids = await Bid.find({ buyer: buyerId })
-      .populate("company", "name category") // get company details
-      .populate("buyer", "name email");     // get buyer details (yourself)
+    if (!bid) return res.status(404).json({ message: "Bid not found" });
+    if (bid.status !== "won")
+      return res.status(400).json({ message: "Only winning bids can be paid" });
+
+    const amount = bid.amount * 100; // Razorpay expects amount in paise
+
+    const options = {
+      amount: amount,
+      currency: "INR",
+      receipt: `receipt_${bid._id}`,
+      notes: {
+        business: bid.business?.name || "Business Purchase",
+      },
+    };
+
+    const order = await razorpay.orders.create(options);
 
     res.status(200).json({
       success: true,
-      count: bids.length,
-      bids,
+      key: process.env.RAZORPAY_KEY_ID,
+      order_id: order.id,
+      currency: "INR",
+      amount,
+      bidId: bid._id,
+      businessName: bid.business?.name || "",
     });
   } catch (error) {
-    console.error("Error fetching buyer bids:", error);
-    res.status(500).json({ error: "Server error while fetching bids" });
+    console.error("❌ Payment init error:", error);
+    res.status(500).json({ message: "Payment initialization failed" });
   }
 });
 
 
-
 /**
  * @swagger
- * /api/buyer/update-bid/{bidId}:
- *   put:
- *     summary: Update a bid
+ * /api/buyer/verify-payment/{bidId}:
+ *   post:
+ *     summary: Verify Razorpay payment and mark bid as paid
+ *     description: Verifies payment signature from Razorpay and updates the bid status to 'paid'.
  *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: bidId
  *         required: true
  *         schema:
  *           type: string
+ *           example: "6730a9cf4f8b1e1c6a96d333"
+ *         description: ID of the bid for which payment is being verified
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - razorpay_order_id
+ *               - razorpay_payment_id
+ *               - razorpay_signature
  *             properties:
- *               amount:
- *                 type: number
+ *               razorpay_order_id:
+ *                 type: string
+ *                 example: order_Fg83jsljf938sL
+ *               razorpay_payment_id:
+ *                 type: string
+ *                 example: pay_Fk72ksj29fkLs
+ *               razorpay_signature:
+ *                 type: string
+ *                 example: d1b3a3e9ec3dafe9a9cba451d4b98216d5c3a68d6d593ee56e674f8a9c239c85
  *     responses:
  *       200:
- *         description: Bid updated successfully
- */
-router.put("/update-bid/:bidId", async (req, res) => {
-  try {
-    const { bidId } = req.params;
-    const { amount } = req.body;
-
-    const bid = await Bid.findByIdAndUpdate(bidId, { amount }, { new: true });
-    if (!bid) return res.status(404).json({ error: "Bid not found" });
-
-    res.status(200).json({ message: "Bid updated successfully", bid });
-  } catch (err) {
-    console.error("Error updating bid:", err);
-    res.status(500).json({ error: "Server error while updating bid" });
-  }
-});
-
-
-/**
- * @swagger
- * /api/buyer/won-bids:
- *   get:
- *     summary: Get all won bids for the logged-in buyer
- *     description: Returns a list of bids with status 'Accepted' or 'Paid' belonging to the current buyer.
- *     tags: [Buyer]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of won bids
+ *         description: Payment verified successfully and bid marked as paid
  *         content:
  *           application/json:
  *             schema:
@@ -337,120 +394,116 @@ router.put("/update-bid/:bidId", async (req, res) => {
  *               properties:
  *                 success:
  *                   type: boolean
- *                 count:
- *                   type: number
- *                 wonBids:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       bidId:
- *                         type: string
- *                         example: "675b08d12abf4f..."
- *                       amount:
- *                         type: number
- *                         example: 50000
- *                       status:
- *                         type: string
- *                         example: "Accepted"
- *                       company:
- *                         type: object
- *                         properties:
- *                           _id:
- *                             type: string
- *                           name:
- *                             type: string
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Payment verified and bid marked as paid"
+ *       400:
+ *         description: Invalid signature or payment verification failed
+ *       500:
+ *         description: Server error while verifying payment
  */
-router.get("/won-bids",authenticate, authorize(["buyer"]), async (req, res) => {
+
+router.post("/verify-payment/:bidId", async (req, res) => {
   try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const { bidId } = req.params;
+
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body)
+      .digest("hex");
+
+    if (expectedSignature === razorpay_signature) {
+      await Bid.findByIdAndUpdate(bidId, {
+        status: "paid",
+        paymentId: razorpay_payment_id,
+      });
+
+      res.status(200).json({ success: true, message: "Payment verified and bid marked as paid" });
+    } else {
+      res.status(400).json({ success: false, message: "Invalid signature, payment verification failed" });
+    }
+  } catch (error) {
+    console.error("❌ Payment verify error:", error);
+    res.status(500).json({ message: "Verification failed", error });
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+/* 🩵 WISHLIST APIs                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @swagger
+ * /api/buyer/wishlist:
+ *   post:
+ *     summary: Add a business to wishlist
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post("/wishlist", authenticate, async (req, res) => {
+  try {
+    const { businessId, notes } = req.body;
     const buyerId = req.user._id;
 
-    // Find bids belonging to this buyer that are accepted or paid
-    const wonBids = await Bid.find({
+    const business = await Business.findById(businessId);
+    if (!business)
+      return res.status(404).json({ message: "Business not found" });
+
+    const existing = await BuyerWishlist.findOne({ buyer: buyerId, business: businessId });
+    if (existing)
+      return res.status(400).json({ message: "Already added to wishlist" });
+
+    const wishlist = await BuyerWishlist.create({
       buyer: buyerId,
-      status: { $in: ["Accepted", "Paid"] },
-    }).populate("company", "name");
+      business: businessId,
+      notes,
+    });
 
-    res.status(200).json({
-      success: true,
-      count: wonBids.length,
-      wonBids: wonBids.map(bid => ({
-        bidId: bid._id,
-        amount: bid.amount,
-        status: bid.status,
-        company: bid.company ? bid.company.name : "Unknown",
-      })),
-    });
-  } catch (err) {
-    console.error("Error fetching won bids:", err);
-    res.status(500).json({
-      success: false,
-      error: "Server error while fetching won bids",
-    });
+    res.status(201).json({ message: "Added to wishlist", wishlist });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 
 /**
  * @swagger
- * /api/buyer/cancel-bid/{bidId}:
+ * /api/buyer/wishlist/view:
+ *   get:
+ *     summary: View all businesses in wishlist
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get("/wishlist/view", authenticate, async (req, res) => {
+  try {
+    const wishlist = await BuyerWishlist.find({ buyer: req.user._id })
+      .populate("business", "name category price location");
+    res.status(200).json({ success: true, count: wishlist.length, wishlist });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/buyer/wishlist/{businessId}:
  *   delete:
- *     summary: Cancel a bid
+ *     summary: Remove a business from wishlist
  *     tags: [Buyer]
- *     parameters:
- *       - in: path
- *         name: bidId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Bid canceled successfully
+ *     security:
+ *       - bearerAuth: []
  */
-router.delete("/cancel-bid/:bidId", async (req, res) => {
+router.delete("/wishlist/:businessId", authenticate, async (req, res) => {
   try {
-    const { bidId } = req.params;
-    const bid = await Bid.findByIdAndDelete(bidId);
-    if (!bid) return res.status(404).json({ error: "Bid not found" });
-
-    res.status(200).json({ message: "Bid canceled successfully" });
-  } catch (err) {
-    console.error("Error canceling bid:", err);
-    res.status(500).json({ error: "Server error while canceling bid" });
-  }
-});
-
-/**
- * @swagger
- * /api/buyer/pay/{bidId}:
- *   post:
- *     summary: Pay for an accepted bid
- *     tags: [Buyer]
- *     parameters:
- *       - in: path
- *         name: bidId
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Payment successful
- */
-router.post("/pay/:bidId", async (req, res) => {
-  try {
-    const { bidId } = req.params;
-    const bid = await Bid.findById(bidId).populate("company");
-
-    if (!bid) return res.status(404).json({ error: "Bid not found" });
-    if (bid.status !== "Accepted")
-      return res.status(400).json({ error: "Only accepted bids can be paid" });
-
-    bid.status = "Paid";
-    await bid.save();
-
-    res.status(200).json({ message: "Payment successful", bid });
-  } catch (err) {
-    console.error("Error processing payment:", err);
-    res.status(500).json({ error: "Server error while processing payment" });
+    const { businessId } = req.params;
+    await BuyerWishlist.findOneAndDelete({ buyer: req.user._id, business: businessId });
+    res.status(200).json({ message: "Removed from wishlist" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 

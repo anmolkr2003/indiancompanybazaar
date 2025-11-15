@@ -132,9 +132,10 @@ const getAllBusinesses = async (req, res) => {
     }
 
     // ✅ Fetch businesses with filters
-    const businesses = await Business.find(filter)
-      .sort({ createdAt: -1 })
-      .populate("userId", "name email role"); // show basic user info
+const businesses = await Business.find(filter)
+  .sort({ createdAt: -1 })
+  .populate("seller", "name email role"); // FIXED
+ // show basic user info
 
     // ✅ Return response
     res.status(200).json({
@@ -166,9 +167,10 @@ const getUnverifiedBusinesses = async (req, res) => {
     }
 
     // ✅ Find unverified businesses
-    const unverified = await Business.find({ verified: false })
-      .sort({ createdAt: -1 })
-      .populate("userId", "name email role");
+const unverified = await Business.find({ verified: false })
+  .sort({ createdAt: -1 })
+  .populate("seller", "name email role"); // FIXED
+
 
     res.status(200).json({
       success: true,

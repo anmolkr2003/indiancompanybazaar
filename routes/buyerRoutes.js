@@ -440,34 +440,95 @@ router.post("/verify-payment/:bidId", async (req, res) => {
  * /api/buyer/wishlist:
  *   post:
  *     summary: Add a business to wishlist
- *     tags: [Buyer]
+ *     tags: [Buyer - Wishlist]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - businessId
+ *             properties:
+ *               businessId:
+ *                 type: string
+ *                 description: ID of the business to add to wishlist
+ *               notes:
+ *                 type: string
+ *                 description: Optional notes added by the buyer
+ *     responses:
+ *       201:
+ *         description: Business added to wishlist successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 wishlist:
+ *                   $ref: '#/components/schemas/BuyerWishlist'
+ *       400:
+ *         description: Bad request (business already exists or missing fields)
+ *       404:
+ *         description: Business not found
+ *       500:
+ *         description: Server error
  */
+
+// routes/buyerRoutes.js
+
 router.post("/wishlist", authenticate, async (req, res) => {
   try {
     const { businessId, notes } = req.body;
     const buyerId = req.user._id;
 
+    if (!businessId) {
+      return res.status(400).json({ message: "businessId is required" });
+    }
+
     const business = await Business.findById(businessId);
-    if (!business)
+    if (!business) {
       return res.status(404).json({ message: "Business not found" });
+    }
 
-    const existing = await BuyerWishlist.findOne({ buyer: buyerId, business: businessId });
-    if (existing)
-      return res.status(400).json({ message: "Already added to wishlist" });
-
-    const wishlist = await BuyerWishlist.create({
+    // ✅ use BuyerWishlist model here
+    const existing = await BuyerWishlist.findOne({
       buyer: buyerId,
       business: businessId,
+    });
+
+    if (existing) {
+      return res
+        .status(400)
+        .json({ message: "Already added to wishlist" });
+    }
+
+    // ✅ use BuyerWishlist model here too
+    const wishlistItem = await BuyerWishlist.create({
+      buyer: buyerId,
+      business: businessId,
+      seller: business.seller, // important: your schema requires this
       notes,
     });
 
-    res.status(201).json({ message: "Added to wishlist", wishlist });
+    return res.status(201).json({
+      success: true,
+      message: "Added to wishlist",
+      wishlist: wishlistItem,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Wishlist error:", error);
+    return res.status(500).json({ message: error.message });
   }
 });
+
+
+
 
 /**
  * @swagger

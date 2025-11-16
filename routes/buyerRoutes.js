@@ -538,16 +538,49 @@ router.post("/wishlist", authenticate, async (req, res) => {
  *     tags: [Buyer]
  *     security:
  *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of wishlist items
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 count:
+ *                   type: number
+ *                 wishlist:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/BuyerWishlist'
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Server error
  */
 router.get("/wishlist/view", authenticate, async (req, res) => {
+  console.log("➡️  wishlist/view route HIT");
+  console.log("User:", req.user);
+
   try {
-    const wishlist = await BuyerWishlist.find({ buyer: req.user._id })
-      .populate("business", "name category price location");
-    res.status(200).json({ success: true, count: wishlist.length, wishlist });
+    const items = await BuyerWishlist.find({ buyer: req.user._id })
+      .populate("business", "companyName categoryOfCompany registeredAddress");
+
+    console.log("Items found:", items);
+
+    return res.status(200).json({
+      success: true,
+      count: items.length,
+      wishlist: items,
+    });
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("❌ Wishlist view error:", error);
+    return res.status(500).json({ message: error.message });
   }
 });
+
 
 /**
  * @swagger

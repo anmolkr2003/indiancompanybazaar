@@ -590,15 +590,42 @@ router.get("/wishlist/view", authenticate, async (req, res) => {
  *     tags: [Buyer]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: businessId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID of the business to remove from wishlist
+ *     responses:
+ *       200:
+ *         description: Successfully removed
+ *       404:
+ *         description: Not found
+ *       500:
+ *         description: Server error
  */
+
 router.delete("/wishlist/:businessId", authenticate, async (req, res) => {
+  console.log("➡️ DELETE wishlist hit");
+  console.log("BusinessId:", req.params.businessId);
+  console.log("Buyer:", req.user._id);
+
   try {
     const { businessId } = req.params;
-    await BuyerWishlist.findOneAndDelete({ buyer: req.user._id, business: businessId });
-    res.status(200).json({ message: "Removed from wishlist" });
+
+    await BuyerWishlist.findOneAndDelete({
+      buyer: req.user._id,
+      business: businessId,
+    });
+
+    return res.status(200).json({ message: "Removed from wishlist" });
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("❌ DELETE wishlist error:", error);
+    return res.status(500).json({ message: error.message });
   }
 });
+
 
 module.exports = router;

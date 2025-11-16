@@ -25,7 +25,10 @@ exports.pending = async (req, res) => {
 // 🔹 Verify a business
 exports.verify = async (req, res) => {
   try {
-    const business = await Business.findById(req.params.id);
+    const businessId = req.params.id;
+
+    // Get business
+    const business = await Business.findById(businessId);
 
     if (!business) {
       return res
@@ -39,26 +42,32 @@ exports.verify = async (req, res) => {
         .json({ success: false, message: "Business is already verified" });
     }
 
-    // ✅ Mark as verified
-    business.verified = true;
-    business.verifiedBy = req.user._id;
-    business.verifiedAt = new Date();
+    // Update verification fields WITHOUT triggering full validation
+    await Business.updateOne(
+      { _id: businessId },
+      {
+        $set: {
+          verified: true,
+          verifiedBy: req.user._id,
+          verifiedAt: new Date(),
+        },
+      }
+    );
 
-    await business.save();
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Business verified successfully",
-      business,
     });
+
   } catch (error) {
     console.error("Error verifying business:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Server error while verifying business",
     });
   }
 };
+
 
 // 🔹 Reject (delete) a business
 exports.reject = async (req, res) => {

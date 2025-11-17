@@ -315,6 +315,8 @@ router.post("/:businessId/documents", upload.single("file"), uploadBusinessDocum
  */
 router.get("/", getAllBusinesses);
 
+
+
 /**
  * @swagger
  * /api/business/{businessId}:

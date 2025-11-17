@@ -96,14 +96,25 @@ const businessListingSchema = new mongoose.Schema(
     ref: "User", // admin who verified
   },
   verifiedAt: { type: Date },
+  highestBid: {
+  type: Number,
+  default: 0,
+},
+
+highestBidder: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+},
   
 
     // ✅ Metadata
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },
-  { timestamps: true }
+  { timestamps: true },
+  
 );
+
 
 businessListingSchema.set("toJSON", { virtuals: true });
 businessListingSchema.set("toObject", { virtuals: true });

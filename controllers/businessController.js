@@ -189,21 +189,49 @@ const unverified = await Business.find({ verified: false })
 
 
 // 🔍 Get single business by ID
+const Bid = require("../models/Bid");
+
 const getBusinessById = async (req, res) => {
   try {
     const { businessId } = req.params;
-    const business = await Business.findById(businessId);
+
+    const business = await Business.findById(businessId)
+      .populate("seller", "name email");
 
     if (!business) {
       return res.status(404).json({ message: "Business not found" });
     }
 
-    res.json(business);
+    // 💡 Load all bids (optional for frontend history)
+    const bids = await Bid.find({ business: businessId })
+      .populate("buyer", "name email")
+      .sort({ amount: -1 });
+
+    // ⭐ STEP 3 — use highestBid saved in business
+    const currentHighestBid = business.highestBid || 0;
+
+    // ⭐ STEP 3 — next minimum bid
+    const minimumNextBid = currentHighestBid + 1000;
+
+    // ⭐ Get starting price safely
+    const startingPrice =
+      business.auctionDetails?.[0]?.startingBidAmount || 0;
+
+    return res.status(200).json({
+      success: true,
+      business,
+      bids,
+      currentHighestBid,
+      minimumNextBid,
+      startingPrice,
+    });
+
   } catch (error) {
     console.error("Error fetching business:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
+
 
 
 

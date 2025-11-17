@@ -3,6 +3,7 @@ const { authenticate } = require("../middleware/authMiddleware");
 const Business = require("../models/Business");
 const Bid = require("../models/Bid");
 const BuyerWishlist = require("../models/wishlist");
+const payments = require("../models/payments");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 
@@ -60,10 +61,14 @@ router.get("/business-listings", authenticate, async (req, res) => {
  * @swagger
  * /api/buyer/place-bid:
  *   post:
- *     summary: Place a bid for a company
+ *     summary: Place a bid on a business
+ *     description: |
+ *       Allows a **buyer** to place a bid on a business.  
+ *       The bid amount must be **greater** than the current highest bid saved in the Business document.
  *     tags: [Buyer]
  *     security:
- *       - bearerAuth: []
+ *       - bearerAuth: []   # Requires JWT token
+ * 
  *     requestBody:
  *       required: true
  *       content:
@@ -76,38 +81,108 @@ router.get("/business-listings", authenticate, async (req, res) => {
  *             properties:
  *               businessId:
  *                 type: string
- *                 example: "6730a9cf4f8b1e1c6a96d333"
+ *                 example: "6720a80f3f8b3a1d2e1a5b8f"
  *               amount:
  *                 type: number
- *                 example: 12000000
+ *                 example: 25000
+ * 
  *     responses:
  *       201:
- *         description: Bid placed successfully
+ *         description: Bid placed successfully, highest bid updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Bid placed successfully"
+ *                 highestBid:
+ *                   type: number
+ *                   example: 25000
+ *                 highestBidder:
+ *                   type: string
+ *                   example: "67089b94ac836a0bca6ad7fb"
+ *                 bid:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     buyer:
+ *                       type: string
+ *                     business:
+ *                       type: string
+ *                     amount:
+ *                       type: number
+ *                     status:
+ *                       type: string
+ *                       example: "pending"
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ * 
+ *       400:
+ *         description: Bid amount is lower than current highest bid
+ * 
+ *       403:
+ *         description: Only buyers can place bids
+ * 
+ *       404:
+ *         description: Business not found
+ * 
+ *       500:
+ *         description: Server error
  */
+
 router.post("/place-bid", authenticate, async (req, res) => {
   try {
     if (req.user.role !== "buyer")
       return res.status(403).json({ message: "Only buyers can place bids" });
 
     const { businessId, amount } = req.body;
-    const buyerId = req.user._id;
 
     const business = await Business.findById(businessId);
-    if (!business)
+
+    if (!business) {
       return res.status(404).json({ message: "Business not found" });
+    }
 
+    // Compare with business highest bid
+    const currentHighest = business.highestBid || 0;
+
+    if (amount <= currentHighest) {
+      return res.status(400).json({
+        message: `Bid must be greater than current highest bid: ${currentHighest}`,
+      });
+    }
+
+    // Save new bid entry
     const bid = await Bid.create({
-  buyer: req.user._id,
-  business: req.body.businessId,
-  amount: req.body.amount,
-  status: "pending",
-});
+      buyer: req.user._id,
+      business: businessId,
+      amount,
+      status: "pending",
+    });
 
-    res.status(201).json({ message: "Bid placed successfully", bid });
+    // Update the highest bid on business
+    business.highestBid = amount;
+    business.highestBidder = req.user._id;
+
+    await business.save();
+
+    res.status(201).json({
+      message: "Bid placed successfully",
+      highestBid: business.highestBid,
+      highestBidder: business.highestBidder,
+      bid,
+    });
+
   } catch (error) {
+    console.error("Place bid error:", error);
     res.status(500).json({ message: error.message });
   }
 });
+
 
 /* -------------------------------------------------------------------------- */
 /* 📜 VIEW ALL BUYER BIDS                                                     */
@@ -430,6 +505,37 @@ router.post("/verify-payment/:bidId", async (req, res) => {
     res.status(500).json({ message: "Verification failed", error });
   }
 });
+
+
+/**
+ * @swagger
+ * /api/buyer/payments:
+ *   get:
+ *     summary: Get all payments of the logged-in user
+ *     tags: [Buyer]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of user payments
+ */
+router.get("/payments", authenticate, async (req, res) => {
+  try {
+    const payments = await Payment.find({ user: req.user._id })
+      .populate("business", "companyName categoryOfCompany registeredAddress")
+      .populate("user", "name email"); 
+
+    return res.status(200).json({
+      success: true,
+      count: payments.length,
+      payments,
+    });
+  } catch (error) {
+    console.error("Payments fetch error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 
 /* -------------------------------------------------------------------------- */
 /* 🩵 WISHLIST APIs                                                          */

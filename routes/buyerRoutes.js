@@ -640,13 +640,24 @@ router.post("/wishlist", authenticate, async (req, res) => {
  * @swagger
  * /api/buyer/wishlist/view:
  *   get:
- *     summary: View all businesses in wishlist
- *     tags: [Buyer]
+ *     summary: Get all wishlist items of the logged-in buyer
+ *     tags: [Buyer Wishlist]
  *     security:
  *       - bearerAuth: []
+ *
+ *     description: |
+ *       Returns detailed wishlist items for the logged-in buyer including:
+ *       - Business details  
+ *       - User’s bid (myBidAmount)  
+ *       - Current highest bid  
+ *       - Total number of bids  
+ *       - Time left for auction  
+ *       - Auction status (Live, Outbid, Ended)  
+ *       - Seller details  
+ *
  *     responses:
  *       200:
- *         description: List of wishlist items
+ *         description: Wishlist fetched successfully
  *         content:
  *           application/json:
  *             schema:
@@ -654,38 +665,163 @@ router.post("/wishlist", authenticate, async (req, res) => {
  *               properties:
  *                 success:
  *                   type: boolean
+ *                   example: true
  *                 count:
  *                   type: number
+ *                   example: 1
  *                 wishlist:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/BuyerWishlist'
+ *                     type: object
+ *                     properties:
+ *                       businessId:
+ *                         type: string
+ *                         example: "690c226c766fbda6f96bf483"
+ *
+ *                       businessName:
+ *                         type: string
+ *                         example: "AUBJBJBK"
+ *
+ *                       categoryOfCompany:
+ *                         type: string
+ *                         example: "Company limited by shares"
+ *
+ *                       registeredAddress:
+ *                         type: string
+ *                         example: "123 Business Street, New Delhi"
+ *
+ *                       myBidAmount:
+ *                         type: number
+ *                         example: 120000
+ *
+ *                       currentHighestBid:
+ *                         type: number
+ *                         example: 125000
+ *
+ *                       bidsCount:
+ *                         type: number
+ *                         example: 8
+ *
+ *                       timeLeft:
+ *                         type: string
+ *                         example: "2h 45m left"
+ *
+ *                       status:
+ *                         type: string
+ *                         enum: [Live, Outbid, Ended]
+ *                         example: "Outbid"
+ *
+ *                       seller:
+ *                         type: object
+ *                         description: Seller (owner of the business)
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                             example: "69079b94ac836a0bca6ad7fb"
+ *                           name:
+ *                             type: string
+ *                             example: "John Seller"
+ *                           email:
+ *                             type: string
+ *                             example: "seller@example.com"
+ *
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2025-11-15T20:11:52.808Z"
+ *
  *       401:
- *         description: Unauthorized
+ *         description: Unauthorized — Invalid or missing token
+ *
  *       500:
  *         description: Server error
  */
+
+
 router.get("/wishlist/view", authenticate, async (req, res) => {
   console.log("➡️  wishlist/view route HIT");
   console.log("User:", req.user);
 
   try {
     const items = await BuyerWishlist.find({ buyer: req.user._id })
-      .populate("business", "companyName categoryOfCompany registeredAddress");
+      .populate("business", "companyName categoryOfCompany registeredAddress auctionDetails highestBid highestBidder")
+      .populate("seller", "name email");
 
-    console.log("Items found:", items);
+    const result = await Promise.all(
+      items.map(async (item) => {
+        const business = item.business;
+
+        // 🟦 Get all bids on this business
+        const allBids = await Bid.find({ business: business._id });
+        const bidsCount = allBids.length;
+        const currentHighestBid =
+          bidsCount > 0 ? Math.max(...allBids.map((b) => b.amount)) : 0;
+
+        // 🟦 Get user's bid
+        const myBidObj = await Bid.findOne({
+          business: business._id,
+          buyer: req.user._id,
+        });
+
+        const myBidAmount = myBidObj ? myBidObj.amount : 0;
+
+        // 🟦 Time left calculation (auctionDetails is an ARRAY)
+        let timeLeft = "N/A";
+
+        const auction = business.auctionDetails?.[0]; // FIRST element
+
+        if (auction && auction.endTime) {
+          const now = new Date();
+          const msLeft = new Date(auction.endTime) - now;
+
+          if (msLeft > 0) {
+            const h = Math.floor(msLeft / (1000 * 60 * 60));
+            const m = Math.floor((msLeft / (1000 * 60)) % 60);
+            timeLeft = `${h}h ${m}m left`;
+          } else {
+            timeLeft = "Ended";
+          }
+        }
+
+        // 🟦 Status logic
+        let status = "Live";
+
+        if (timeLeft === "Ended") {
+          status = "Ended";
+        } else if (myBidAmount < currentHighestBid && myBidAmount !== 0) {
+          status = "Outbid";
+        }
+
+        return {
+          businessId: business._id,
+          businessName: business.companyName,
+          categoryOfCompany: business.categoryOfCompany,
+          registeredAddress: business.registeredAddress,
+
+          myBidAmount,
+          currentHighestBid,
+          bidsCount,
+          timeLeft,
+          status,
+
+          seller: item.seller,
+          createdAt: item.createdAt,
+        };
+      })
+    );
 
     return res.status(200).json({
       success: true,
-      count: items.length,
-      wishlist: items,
+      count: result.length,
+      wishlist: result,
     });
-
   } catch (error) {
     console.error("❌ Wishlist view error:", error);
     return res.status(500).json({ message: error.message });
   }
 });
+
+
 
 
 /**

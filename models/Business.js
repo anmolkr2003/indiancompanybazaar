@@ -53,6 +53,10 @@ const businessListingSchema = new mongoose.Schema(
     subCategory: { type: String },
     classOfCompany: { type: String },
     categoryOfCompany: { type: String },
+    numberOfEmployees: {
+  type: Number,
+  required: true,   // or false if optional
+},
 
     // ✅ Listing Info
     listedInStockExchange: { type: Boolean, default: false },

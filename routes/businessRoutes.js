@@ -32,7 +32,8 @@ const router = express.Router();
  *     description: |
  *       Creates a new business record in the system.  
  *       Only users with roles **Seller** or **CA** can perform this action.  
- *       By default, all newly created businesses will have `verified: false` until approved by an admin.
+ *       Newly created businesses will have `verified: false` until approved by an admin.
+ *
  *     requestBody:
  *       required: true
  *       content:
@@ -42,51 +43,72 @@ const router = express.Router();
  *             required:
  *               - CIN
  *               - companyName
+ *               - registrationNumber
+ *               - numberOfEmployees
  *             properties:
  *               CIN:
  *                 type: string
  *                 example: "U12345DL2020PTC123456"
+ *
  *               companyName:
  *                 type: string
  *                 example: "ABC Pvt Ltd"
+ *
  *               ROC:
  *                 type: string
  *                 example: "Delhi"
+ *
  *               registrationNumber:
  *                 type: string
  *                 example: "123456"
+ *
  *               registeredAddress:
  *                 type: string
  *                 example: "123 Business Street, New Delhi"
+ *
  *               subCategory:
  *                 type: string
  *                 example: "Private Limited"
+ *
  *               categoryOfCompany:
  *                 type: string
  *                 example: "Company limited by shares"
+ *
  *               classOfCompany:
  *                 type: string
  *                 example: "Private"
+ *
+ *               numberOfEmployees:
+ *                 type: number
+ *                 example: 150
+ *                 description: "Total number of employees at the time of registration"
+ *
  *               listedInStockExchange:
  *                 type: boolean
- *                 example: true
+ *                 example: false
+ *
  *               listedStockExchange:
  *                 type: string
- *                 example: "BSE"
+ *                 example: "NSE"
+ *
  *               authorizedCapital:
  *                 type: number
  *                 example: 1000000
+ *
  *               paidUpCapital:
  *                 type: number
  *                 example: 500000
+ *
  *               dateOfIncorporation:
  *                 type: string
  *                 format: date
  *                 example: "2022-07-15"
+ *
  *               dateOfBalanceSheet:
  *                 type: string
  *                 format: date
  *                 example: "2024-03-31"
+ *
  *               importantDates:
  *                 type: object
  *                 properties:
@@ -98,6 +120,7 @@ const router = express.Router();
  *                     type: string
  *                     format: date
  *                     example: "2024-10-15"
+ *
  *               directors:
  *                 type: array
  *                 items:
@@ -119,6 +142,7 @@ const router = express.Router();
  *                     isSignatory:
  *                       type: boolean
  *                       example: true
+ *
  *     responses:
  *       201:
  *         description: Business registered successfully
@@ -142,19 +166,23 @@ const router = express.Router();
  *                     CIN:
  *                       type: string
  *                       example: "U12345DL2020PTC123456"
+ *                     numberOfEmployees:
+ *                       type: number
+ *                       example: 150
  *                     verified:
  *                       type: boolean
  *                       example: false
- *                       description: "Indicates whether the business is verified by an admin (default: false)"
+ *
  *       400:
- *         description: Bad Request – Missing or invalid input fields
+ *         description: Missing or invalid input fields
  *       401:
  *         description: Unauthorized – Missing or invalid JWT token
  *       403:
- *         description: Forbidden – Only users with roles Seller or CA can access this route
+ *         description: Forbidden – Only Seller or CA can register business
  *       500:
  *         description: Internal Server Error
  */
+
 
 console.log("✅ Business routes loaded");
 

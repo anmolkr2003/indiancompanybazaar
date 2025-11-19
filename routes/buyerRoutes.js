@@ -511,14 +511,105 @@ router.post("/verify-payment/:bidId", async (req, res) => {
  * @swagger
  * /api/buyer/payments:
  *   get:
- *     summary: Get all payments of the logged-in user
+ *     summary: Get all payments of the logged-in buyer
  *     tags: [Buyer]
  *     security:
  *       - bearerAuth: []
+ *
+ *     description: |
+ *       Returns a list of all payments made by the logged-in buyer, including:
+ *       - Payment details  
+ *       - Business details  
+ *       - Bid amount  
+ *       - Payment status  
+ *       - Transaction details  
+ *
  *     responses:
  *       200:
- *         description: List of user payments
+ *         description: Payments fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 count:
+ *                   type: number
+ *                   example: 2
+ *                 payments:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         example: "PAY_9012ABCD1234"
+ *
+ *                       user:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                             example: "69079b94ac836a0bca6ad7fb"
+ *                           name:
+ *                             type: string
+ *                             example: "Aman Sharma"
+ *                           email:
+ *                             type: string
+ *                             example: "aman@gmail.com"
+ *
+ *                       business:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                             example: "690c226c766fbda6f96bf483"
+ *                           companyName:
+ *                             type: string
+ *                             example: "Bhagat Ayurvedic Pvt Ltd"
+ *                           categoryOfCompany:
+ *                             type: string
+ *                             example: "Company limited by shares"
+ *                           registeredAddress:
+ *                             type: string
+ *                             example: "123 Business Street, New Delhi"
+ *
+ *                       bidId:
+ *                         type: string
+ *                         example: "6918de88eb4db0622f95f117"
+ *
+ *                       amount:
+ *                         type: number
+ *                         example: 120000
+ *
+ *                       paymentStatus:
+ *                         type: string
+ *                         example: "success"
+ *                         enum: [success, failed, pending]
+ *
+ *                       paymentMethod:
+ *                         type: string
+ *                         example: "UPI"
+ *
+ *                       transactionId:
+ *                         type: string
+ *                         example: "TXN_44G77J8HHS2"
+ *
+ *                       currency:
+ *                         type: string
+ *                         example: "INR"
+ *
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2025-11-18T06:50:12.300Z"
+ *
+ *       500:
+ *         description: Server error
  */
+
 router.get("/payments", authenticate, async (req, res) => {
   try {
     const payments = await Payment.find({ user: req.user._id })
@@ -535,6 +626,7 @@ router.get("/payments", authenticate, async (req, res) => {
     return res.status(500).json({ success: false, message: error.message });
   }
 });
+
 
 
 /* -------------------------------------------------------------------------- */

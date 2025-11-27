@@ -6,6 +6,7 @@ const {
   getAllBusinesses,
   getBusinessById,
   deleteBusiness,
+  getCSVCompanies,
 } = require("../controllers/businessController");
 const Business = require("../models/Business.js");
 const upload = require("../middleware/upload");
@@ -196,6 +197,79 @@ router.post("/register", (req, res, next) => {
   console.log("🟢 3️⃣ After authorize:", req.user ? req.user.email : "No user");
   next();
 }, registerBusiness);
+
+
+
+/**
+ * @swagger
+ * /api/business/all-companies:
+ *   get:
+ *     summary: Get companies from CSV with pagination
+ *     description: Fetch companies from the CSV file.
+ *     tags: [Business]
+ *
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 1
+ *         description: Page number (starts from 1)
+ *
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           example: 10
+ *         description: Number of items per page
+ *
+ *     responses:
+ *       200:
+ *         description: Paginated CSV company list returned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 total:
+ *                   type: integer
+ *                   example: 12300
+ *                 page:
+ *                   type: integer
+ *                   example: 1
+ *                 limit:
+ *                   type: integer
+ *                   example: 10
+ *                 totalPages:
+ *                   type: integer
+ *                   example: 1230
+ *                 nextPage:
+ *                   type: integer
+ *                   example: 2
+ *                 prevPage:
+ *                   type: integer
+ *                   example: null
+ *                 companies:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     example:
+ *                       CompanyName: "ABC Pvt Ltd"
+ *                       CIN: "U12345DL2010PTC123456"
+ *                       State: "Delhi"
+ *                       ROC: "RoC-Delhi"
+ *                       ActiveCompliance: "ACTIVE"
+ *
+ *       500:
+ *         description: Server error while reading CSV file
+ */
+
+router.get("/all-companies", getCSVCompanies);
 
 
 

@@ -3,7 +3,9 @@ const { authenticate } = require("../middleware/authMiddleware");
 const Business = require("../models/Business");
 const Bid = require("../models/Bid");
 const BuyerWishlist = require("../models/wishlist");
-const payments = require("../models/payments");
+const Payment = require("../models/payments");
+const { getCSVCompanies } = require("../controllers/businessController");
+
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
 
@@ -52,6 +54,8 @@ router.get("/business-listings", authenticate, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
+
+
 
 /* -------------------------------------------------------------------------- */
 /* 💸 PLACE A BID                                                             */
@@ -614,7 +618,7 @@ router.get("/payments", authenticate, async (req, res) => {
   try {
     const payments = await Payment.find({ user: req.user._id })
       .populate("business", "companyName categoryOfCompany registeredAddress")
-      .populate("user", "name email"); 
+      .populate("user", "name email");
 
     return res.status(200).json({
       success: true,

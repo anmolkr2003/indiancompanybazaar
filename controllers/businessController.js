@@ -1,4 +1,8 @@
 const Business = require("../models/Business");
+const fs = require("fs");
+const path = require("path");
+const csv = require("csv-parser");
+const loadCSV = require("../utils/csvLoader");
 
 /**
  * @desc Register a new business (only Seller or CA can do this)
@@ -189,7 +193,6 @@ const unverified = await Business.find({ verified: false })
 
 
 // 🔍 Get single business by ID
-const Bid = require("../models/Bid");
 
 const getBusinessById = async (req, res) => {
   try {
@@ -252,6 +255,35 @@ const deleteBusiness = async (req, res) => {
   }
 };
 
+const getCSVCompanies = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page || "1");
+    const limit = parseInt(req.query.limit || "10");
+
+    const data = await loadCSV(); // 👈 loads once → reused forever
+
+    const total = data.length;
+    const totalPages = Math.ceil(total / limit);
+    const offset = (page - 1) * limit;
+
+    const companies = data.slice(offset, offset + limit);
+
+    return res.json({
+      success: true,
+      total,
+      page,
+      limit,
+      totalPages,
+      companies,
+      nextPage: page < totalPages ? page + 1 : null,
+      prevPage: page > 1 ? page - 1 : null,
+    });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+};
+
+
 module.exports = {
   registerBusiness,
   addAuctionDetails,
@@ -259,4 +291,5 @@ module.exports = {
   getAllBusinesses,
   getBusinessById,
   deleteBusiness,
+  getCSVCompanies,
 };

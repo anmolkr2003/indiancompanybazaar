@@ -1,4 +1,5 @@
 const Business = require("../models/Business");
+const Bid = require("../models/Bid");
 const fs = require("fs");
 const path = require("path");
 const csv = require("csv-parser");
@@ -259,14 +260,23 @@ const getCSVCompanies = async (req, res) => {
   try {
     const page = parseInt(req.query.page || "1");
     const limit = parseInt(req.query.limit || "10");
+    const search = (req.query.search || "").toLowerCase();
 
-    const data = await loadCSV(); // 👈 loads once → reused forever
+    const data = await loadCSV(); // full CSV data (cached)
 
-    const total = data.length;
+    // 🔍 GLOBAL SEARCH (search entire CSV)
+    let filtered = data;
+    if (search) {
+      filtered = data.filter((item) =>
+        item.CompanyName?.toLowerCase().includes(search)
+      );
+    }
+
+    const total = filtered.length;
     const totalPages = Math.ceil(total / limit);
     const offset = (page - 1) * limit;
 
-    const companies = data.slice(offset, offset + limit);
+    const companies = filtered.slice(offset, offset + limit);
 
     return res.json({
       success: true,
@@ -274,14 +284,15 @@ const getCSVCompanies = async (req, res) => {
       page,
       limit,
       totalPages,
-      companies,
       nextPage: page < totalPages ? page + 1 : null,
       prevPage: page > 1 ? page - 1 : null,
+      companies,
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 };
+
 
 
 module.exports = {

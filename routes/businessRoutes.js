@@ -204,14 +204,18 @@ router.post("/register", (req, res, next) => {
  * @swagger
  * /api/business/all-companies:
  *   get:
- *     summary: Get companies from CSV with pagination
- *     description: Fetch companies from the CSV file.
+ *     summary: Get companies from CSV with pagination and global search
+ *     description: |
+ *       Fetches company records from a CSV file.
+ *       - Supports **global search** by company name (searches entire CSV, not just paginated results)
+ *       - Supports **pagination** using `page` and `limit`
+ *       - Always returns correct pagination even after filtering
+ *
  *     tags: [Business]
  *
  *     parameters:
  *       - in: query
  *         name: page
- *         required: false
  *         schema:
  *           type: integer
  *           example: 1
@@ -219,15 +223,21 @@ router.post("/register", (req, res, next) => {
  *
  *       - in: query
  *         name: limit
- *         required: false
  *         schema:
  *           type: integer
  *           example: 10
  *         description: Number of items per page
  *
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *           example: "TATA"
+ *         description: Filter companies globally by company name (case-insensitive)
+ *
  *     responses:
  *       200:
- *         description: Paginated CSV company list returned successfully
+ *         description: Paginated list of companies from CSV
  *         content:
  *           application/json:
  *             schema:
@@ -238,7 +248,7 @@ router.post("/register", (req, res, next) => {
  *                   example: true
  *                 total:
  *                   type: integer
- *                   example: 12300
+ *                   example: 12456
  *                 page:
  *                   type: integer
  *                   example: 1
@@ -247,7 +257,7 @@ router.post("/register", (req, res, next) => {
  *                   example: 10
  *                 totalPages:
  *                   type: integer
- *                   example: 1230
+ *                   example: 1246
  *                 nextPage:
  *                   type: integer
  *                   example: 2
@@ -258,16 +268,27 @@ router.post("/register", (req, res, next) => {
  *                   type: array
  *                   items:
  *                     type: object
- *                     example:
- *                       CompanyName: "ABC Pvt Ltd"
- *                       CIN: "U12345DL2010PTC123456"
- *                       State: "Delhi"
- *                       ROC: "RoC-Delhi"
- *                       ActiveCompliance: "ACTIVE"
+ *                     properties:
+ *                       CompanyName:
+ *                         type: string
+ *                         example: "TATA CONSULTANCY SERVICES LIMITED"
+ *                       CIN:
+ *                         type: string
+ *                         example: "L22210MH1995PLC084781"
+ *                       State:
+ *                         type: string
+ *                         example: "Maharashtra"
+ *                       ROC:
+ *                         type: string
+ *                         example: "RoC-Mumbai"
+ *                       ActiveCompliance:
+ *                         type: string
+ *                         example: "ACTIVE"
  *
  *       500:
- *         description: Server error while reading CSV file
+ *         description: Server error while reading CSV
  */
+
 
 router.get("/all-companies", getCSVCompanies);
 

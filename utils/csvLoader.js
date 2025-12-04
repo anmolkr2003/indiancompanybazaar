@@ -14,6 +14,7 @@ function loadCSV() {
       "company_master_data2025-05-30.csv"
     );
 
+    
     const results = [];
 
     fs.createReadStream(FILE_PATH)

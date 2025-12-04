@@ -262,14 +262,19 @@ const getCSVCompanies = async (req, res) => {
     const limit = parseInt(req.query.limit || "10");
     const search = (req.query.search || "").toLowerCase();
 
-    const data = await loadCSV(); // full CSV data (cached)
+    // const data = await loadCSV(); // full CSV data (cached)
+    const data = await loadCSV();
+console.log("CSV LENGTH:", data.length);
+console.log("FIRST ROW:", data[0]);
+
 
     // 🔍 GLOBAL SEARCH (search entire CSV)
     let filtered = data;
     if (search) {
       filtered = data.filter((item) =>
-        item.CompanyName?.toLowerCase().includes(search)
-      );
+  item["Company Name"]?.toLowerCase().includes(search)
+);
+
     }
 
     const total = filtered.length;

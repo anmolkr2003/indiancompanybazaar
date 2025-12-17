@@ -55,7 +55,7 @@ const businessListingSchema = new mongoose.Schema(
     categoryOfCompany: { type: String },
     numberOfEmployees: {
   type: Number,
-  required: true,   // or false if optional
+  required: false,   // or false if optional
 },
 
     // ✅ Listing Info
